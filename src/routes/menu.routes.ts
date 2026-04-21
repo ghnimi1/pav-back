@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authMiddleware, adminOnly } from '../middleware/auth.middleware'
 import { MenuController } from '../controllers/menu.controller'
+import { uploadMenuImage } from '../middleware/upload.middleware'
 
 const router = Router()
 
@@ -28,8 +29,8 @@ router.delete('/categories/:id', adminOnly, MenuController.deleteCategory)
 
 // Items (admin only)
 router.get('/items/all', adminOnly, MenuController.getAllItems)
-router.post('/items', adminOnly, MenuController.createItem)
-router.put('/items/:id', adminOnly, MenuController.updateItem)
+router.post('/items', adminOnly, uploadMenuImage.single('imageFile'), MenuController.createItem)
+router.put('/items/:id', adminOnly, uploadMenuImage.single('imageFile'), MenuController.updateItem)
 router.delete('/items/:id', adminOnly, MenuController.deleteItem)
 router.patch('/items/:id/toggle', adminOnly, MenuController.toggleAvailability)
 
@@ -55,8 +56,8 @@ router.put('/breakfast/categories/:id', adminOnly, MenuController.updateBreakfas
 router.delete('/breakfast/categories/:id', adminOnly, MenuController.deleteBreakfastCategory)
 
 router.get('/breakfast/items/all', adminOnly, MenuController.getAllBreakfastItems)
-router.post('/breakfast/items', adminOnly, MenuController.createBreakfastItem)
-router.put('/breakfast/items/:id', adminOnly, MenuController.updateBreakfastItem)
+router.post('/breakfast/items', adminOnly, uploadMenuImage.single('imageFile'), MenuController.createBreakfastItem)
+router.put('/breakfast/items/:id', adminOnly, uploadMenuImage.single('imageFile'), MenuController.updateBreakfastItem)
 router.delete('/breakfast/items/:id', adminOnly, MenuController.deleteBreakfastItem)
 
 router.get('/breakfast/formulas/all', adminOnly, MenuController.getAllBreakfastFormulas)
