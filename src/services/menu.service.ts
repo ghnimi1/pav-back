@@ -2,10 +2,16 @@ import { MenuCategoryModel } from '../models/MenuCategory.model'
 import { MenuItemModel } from '../models/MenuItem.model'
 import { SupplementModel } from '../models/Supplement.model'
 import { OfferModel } from '../models/Offer.model'
+import { BreakfastCategoryModel } from '../models/BreakfastCategory.model'
+import { BreakfastItemModel } from '../models/BreakfastItem.model'
+import { BreakfastFormulaModel } from '../models/BreakfastFormula.model'
 import type { MenuCategory, CreateMenuCategoryInput } from '../models/MenuCategory.model'
 import type { MenuItem, CreateMenuItemInput } from '../models/MenuItem.model'
 import type { Supplement, CreateSupplementInput } from '../models/Supplement.model'
 import type { Offer, CreateOfferInput } from '../models/Offer.model'
+import type { BreakfastCategory, CreateBreakfastCategoryInput } from '../models/BreakfastCategory.model'
+import type { BreakfastItem, CreateBreakfastItemInput } from '../models/BreakfastItem.model'
+import type { BreakfastFormula } from '../models/BreakfastFormula.model'
 
 // ============================================
 // MENU CATEGORY SERVICE
@@ -207,6 +213,130 @@ export class OfferService {
 }
 
 // ============================================
+// BREAKFAST CATEGORY SERVICE
+// ============================================
+
+export class BreakfastCategoryService {
+  async getAllCategories(): Promise<BreakfastCategory[]> {
+    return BreakfastCategoryModel.findAll()
+  }
+
+  async getActiveCategories(): Promise<BreakfastCategory[]> {
+    return BreakfastCategoryModel.findActive()
+  }
+
+  async getCategoryById(id: string): Promise<BreakfastCategory | null> {
+    return BreakfastCategoryModel.findById(id)
+  }
+
+  async createCategory(data: CreateBreakfastCategoryInput): Promise<BreakfastCategory> {
+    return BreakfastCategoryModel.create(data)
+  }
+
+  async updateCategory(id: string, data: Partial<BreakfastCategory>): Promise<void> {
+    const category = await BreakfastCategoryModel.findById(id)
+    if (!category) {
+      throw new Error('CatÃ©gorie petit dÃ©jeuner non trouvÃ©e')
+    }
+    await BreakfastCategoryModel.update(id, data)
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    const category = await BreakfastCategoryModel.findById(id)
+    if (!category) {
+      throw new Error('CatÃ©gorie petit dÃ©jeuner non trouvÃ©e')
+    }
+
+    const items = await BreakfastItemModel.findByCategory(id)
+    if (items.length > 0) {
+      throw new Error(`Impossible de supprimer: ${items.length} article(s) utilisent cette catÃ©gorie`)
+    }
+
+    await BreakfastCategoryModel.delete(id)
+  }
+}
+
+// ============================================
+// BREAKFAST ITEM SERVICE
+// ============================================
+
+export class BreakfastItemService {
+  async getAllItems(): Promise<BreakfastItem[]> {
+    return BreakfastItemModel.findAll()
+  }
+
+  async getActiveItems(): Promise<BreakfastItem[]> {
+    return BreakfastItemModel.findActive()
+  }
+
+  async getItemsByCategory(categoryId: string): Promise<BreakfastItem[]> {
+    return BreakfastItemModel.findByCategory(categoryId)
+  }
+
+  async getItemById(id: string): Promise<BreakfastItem | null> {
+    return BreakfastItemModel.findById(id)
+  }
+
+  async createItem(data: CreateBreakfastItemInput): Promise<BreakfastItem> {
+    const category = await BreakfastCategoryModel.findById(data.categoryId)
+    if (!category) {
+      throw new Error('CatÃ©gorie petit dÃ©jeuner non trouvÃ©e')
+    }
+    return BreakfastItemModel.create(data)
+  }
+
+  async updateItem(id: string, data: Partial<BreakfastItem>): Promise<void> {
+    const item = await BreakfastItemModel.findById(id)
+    if (!item) {
+      throw new Error('Article petit dÃ©jeuner non trouvÃ©')
+    }
+    await BreakfastItemModel.update(id, data)
+  }
+
+  async deleteItem(id: string): Promise<void> {
+    const item = await BreakfastItemModel.findById(id)
+    if (!item) {
+      throw new Error('Article petit dÃ©jeuner non trouvÃ©')
+    }
+    await BreakfastItemModel.delete(id)
+  }
+}
+
+// ============================================
+// BREAKFAST FORMULA SERVICE
+// ============================================
+
+export class BreakfastFormulaService {
+  async getAllFormulas(): Promise<BreakfastFormula[]> {
+    return BreakfastFormulaModel.findAll()
+  }
+
+  async getActiveFormulas(): Promise<BreakfastFormula[]> {
+    return BreakfastFormulaModel.findActive()
+  }
+
+  async getFormulaById(id: string): Promise<BreakfastFormula | null> {
+    return BreakfastFormulaModel.findById(id)
+  }
+
+  async createFormula(data: Omit<BreakfastFormula, '_id' | 'createdAt' | 'updatedAt'>): Promise<BreakfastFormula> {
+    const existing = await BreakfastFormulaModel.findByType(data.type)
+    if (existing) {
+      throw new Error('Une formule de ce type existe dÃ©jÃ ')
+    }
+    return BreakfastFormulaModel.create(data)
+  }
+
+  async updateFormula(id: string, data: Partial<BreakfastFormula>): Promise<void> {
+    const formula = await BreakfastFormulaModel.findById(id)
+    if (!formula) {
+      throw new Error('Formule petit dÃ©jeuner non trouvÃ©e')
+    }
+    await BreakfastFormulaModel.update(id, data)
+  }
+}
+
+// ============================================
 // EXPORT SINGLETONS
 // ============================================
 
@@ -214,3 +344,6 @@ export const menuCategoryService = new MenuCategoryService()
 export const menuItemService = new MenuItemService()
 export const supplementService = new SupplementService()
 export const offerService = new OfferService()
+export const breakfastCategoryService = new BreakfastCategoryService()
+export const breakfastItemService = new BreakfastItemService()
+export const breakfastFormulaService = new BreakfastFormulaService()

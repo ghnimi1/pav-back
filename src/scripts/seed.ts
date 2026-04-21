@@ -33,6 +33,9 @@ async function seed() {
     await db.collection('menu_items').deleteMany({})
     await db.collection('supplements').deleteMany({})
     await db.collection('offers').deleteMany({})
+    await db.collection('breakfast_categories').deleteMany({})
+    await db.collection('breakfast_items').deleteMany({})
+    await db.collection('breakfast_formulas').deleteMany({})
     console.log('✅ Anciennes données supprimées')
     
     // ============================================

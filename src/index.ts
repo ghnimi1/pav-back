@@ -14,8 +14,8 @@ app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }))
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // Routes
 app.use('/api/auth', authRoutes)
@@ -30,6 +30,9 @@ app.get('/api/health', (req, res) => {
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if ((err as any)?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Payload trop volumineux' })
+  }
   console.error('Error:', err.stack)
   res.status(500).json({ error: 'Erreur interne du serveur' })
 })

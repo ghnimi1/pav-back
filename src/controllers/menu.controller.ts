@@ -3,7 +3,10 @@ import {
   menuCategoryService, 
   menuItemService, 
   supplementService, 
-  offerService 
+  offerService,
+  breakfastCategoryService,
+  breakfastItemService,
+  breakfastFormulaService,
 } from '../services/menu.service'
 import { getDB } from '../config/database'
 
@@ -366,6 +369,192 @@ export const MenuController = {
     } catch (error: any) {
       console.error('Delete offer error:', error)
       res.status(400).json({ success: false, error: error.message || 'Erreur lors de la suppression' })
+    }
+  },
+
+  // ============================================
+  // BREAKFAST CATEGORIES
+  // ============================================
+
+  async getAllBreakfastCategories(req: Request, res: Response) {
+    try {
+      const categories = await breakfastCategoryService.getAllCategories()
+      res.json({ success: true, data: categories })
+    } catch (error) {
+      console.error('Get all breakfast categories error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la rÃ©cupÃ©ration' })
+    }
+  },
+
+  async getActiveBreakfastCategories(req: Request, res: Response) {
+    try {
+      const categories = await breakfastCategoryService.getActiveCategories()
+      res.json({ success: true, data: categories })
+    } catch (error) {
+      console.error('Get active breakfast categories error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la rÃ©cupÃ©ration' })
+    }
+  },
+
+  async createBreakfastCategory(req: Request, res: Response) {
+    try {
+      const category = await breakfastCategoryService.createCategory(req.body)
+      res.status(201).json({ success: true, data: category, message: 'CatÃ©gorie petit dÃ©jeuner crÃ©Ã©e avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Create breakfast category error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la crÃ©ation' })
+    }
+  },
+
+  async updateBreakfastCategory(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+      await breakfastCategoryService.updateCategory(id, req.body)
+      res.json({ success: true, message: 'CatÃ©gorie petit dÃ©jeuner mise Ã  jour avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Update breakfast category error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la mise Ã  jour' })
+    }
+  },
+
+  async deleteBreakfastCategory(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+      await breakfastCategoryService.deleteCategory(id)
+      res.json({ success: true, message: 'CatÃ©gorie petit dÃ©jeuner supprimÃ©e avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Delete breakfast category error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la suppression' })
+    }
+  },
+
+  // ============================================
+  // BREAKFAST ITEMS
+  // ============================================
+
+  async getAllBreakfastItems(req: Request, res: Response) {
+    try {
+      const items = await breakfastItemService.getAllItems()
+      res.json({ success: true, data: items })
+    } catch (error) {
+      console.error('Get all breakfast items error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la rÃ©cupÃ©ration' })
+    }
+  },
+
+  async getActiveBreakfastItems(req: Request, res: Response) {
+    try {
+      const items = await breakfastItemService.getActiveItems()
+      res.json({ success: true, data: items })
+    } catch (error) {
+      console.error('Get active breakfast items error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la rÃ©cupÃ©ration' })
+    }
+  },
+
+  async getBreakfastItemsByCategory(req: Request, res: Response) {
+    try {
+      const categoryId = getParamString(req.params.categoryId)
+      if (!categoryId) {
+        return res.status(400).json({ success: false, error: 'categoryId requis' })
+      }
+      const items = await breakfastItemService.getItemsByCategory(categoryId)
+      res.json({ success: true, data: items })
+    } catch (error) {
+      console.error('Get breakfast items by category error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la rÃ©cupÃ©ration' })
+    }
+  },
+
+  async createBreakfastItem(req: Request, res: Response) {
+    try {
+      const item = await breakfastItemService.createItem(req.body)
+      res.status(201).json({ success: true, data: item, message: 'Article petit dÃ©jeuner crÃ©Ã© avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Create breakfast item error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la crÃ©ation' })
+    }
+  },
+
+  async updateBreakfastItem(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+      await breakfastItemService.updateItem(id, req.body)
+      res.json({ success: true, message: 'Article petit dÃ©jeuner mis Ã  jour avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Update breakfast item error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la mise Ã  jour' })
+    }
+  },
+
+  async deleteBreakfastItem(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+      await breakfastItemService.deleteItem(id)
+      res.json({ success: true, message: 'Article petit dÃ©jeuner supprimÃ© avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Delete breakfast item error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la suppression' })
+    }
+  },
+
+  // ============================================
+  // BREAKFAST FORMULAS
+  // ============================================
+
+  async getAllBreakfastFormulas(req: Request, res: Response) {
+    try {
+      const formulas = await breakfastFormulaService.getAllFormulas()
+      res.json({ success: true, data: formulas })
+    } catch (error) {
+      console.error('Get all breakfast formulas error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la rÃ©cupÃ©ration' })
+    }
+  },
+
+  async getActiveBreakfastFormulas(req: Request, res: Response) {
+    try {
+      const formulas = await breakfastFormulaService.getActiveFormulas()
+      res.json({ success: true, data: formulas })
+    } catch (error) {
+      console.error('Get active breakfast formulas error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la rÃ©cupÃ©ration' })
+    }
+  },
+
+  async createBreakfastFormula(req: Request, res: Response) {
+    try {
+      const formula = await breakfastFormulaService.createFormula(req.body)
+      res.status(201).json({ success: true, data: formula, message: 'Formule petit dÃ©jeuner crÃ©Ã©e avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Create breakfast formula error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la crÃ©ation' })
+    }
+  },
+
+  async updateBreakfastFormula(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+      await breakfastFormulaService.updateFormula(id, req.body)
+      res.json({ success: true, message: 'Formule petit dÃ©jeuner mise Ã  jour avec succÃ¨s' })
+    } catch (error: any) {
+      console.error('Update breakfast formula error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la mise Ã  jour' })
     }
   }
 }

@@ -11,6 +11,10 @@ router.get('/items/category/:categoryId', MenuController.getItemsByCategory)
 router.get('/items/:id', MenuController.getItemById)
 router.get('/supplements', MenuController.getActiveSupplements)
 router.get('/offers/current', MenuController.getCurrentOffers)
+router.get('/breakfast/categories', MenuController.getActiveBreakfastCategories)
+router.get('/breakfast/items', MenuController.getActiveBreakfastItems)
+router.get('/breakfast/items/category/:categoryId', MenuController.getBreakfastItemsByCategory)
+router.get('/breakfast/formulas', MenuController.getActiveBreakfastFormulas)
 
 // Protected routes (require auth)
 router.use(authMiddleware)
@@ -43,5 +47,20 @@ router.get('/offers/:id', adminOnly, MenuController.getOfferById)
 router.post('/offers', adminOnly, MenuController.createOffer)
 router.put('/offers/:id', adminOnly, MenuController.updateOffer)
 router.delete('/offers/:id', adminOnly, MenuController.deleteOffer)
+
+// Breakfast module (admin only)
+router.get('/breakfast/categories/all', adminOnly, MenuController.getAllBreakfastCategories)
+router.post('/breakfast/categories', adminOnly, MenuController.createBreakfastCategory)
+router.put('/breakfast/categories/:id', adminOnly, MenuController.updateBreakfastCategory)
+router.delete('/breakfast/categories/:id', adminOnly, MenuController.deleteBreakfastCategory)
+
+router.get('/breakfast/items/all', adminOnly, MenuController.getAllBreakfastItems)
+router.post('/breakfast/items', adminOnly, MenuController.createBreakfastItem)
+router.put('/breakfast/items/:id', adminOnly, MenuController.updateBreakfastItem)
+router.delete('/breakfast/items/:id', adminOnly, MenuController.deleteBreakfastItem)
+
+router.get('/breakfast/formulas/all', adminOnly, MenuController.getAllBreakfastFormulas)
+router.post('/breakfast/formulas', adminOnly, MenuController.createBreakfastFormula)
+router.put('/breakfast/formulas/:id', adminOnly, MenuController.updateBreakfastFormula)
 
 export default router
