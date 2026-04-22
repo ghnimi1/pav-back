@@ -7,6 +7,7 @@ import {
   menuCategoryService,
   menuItemService,
   offerService,
+  supplementCategoryService,
   supplementService,
 } from '../services/menu.service'
 import { getLocalUploadAbsolutePath, getUploadedImagePath } from '../middleware/upload.middleware'

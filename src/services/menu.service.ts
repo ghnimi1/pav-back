@@ -197,22 +197,27 @@ export class SupplementService {
   }
   
   async deleteSupplement(id: string): Promise<void> {
-    const supplement = await SupplementModel.findById(id)
-    if (!supplement) {
-      throw new Error('Supplement non trouvé')
-    }
-    
-    const db = (await import('../config/database')).getDB()
-    const itemsWithSupplement = await db.collection('menu_items')
-      .find({ 'supplements.supplementId': id })
-      .toArray()
-    
-    if (itemsWithSupplement.length > 0) {
-      throw new Error(`Impossible de supprimer: ${itemsWithSupplement.length} article(s) utilisent ce supplement`)
-    }
-    
-    await SupplementModel.delete(id)
+  const supplement = await SupplementModel.findById(id)
+  if (!supplement) {
+    throw new Error('Supplement non trouvé')
   }
+  
+  const db = (await import('../config/database')).getDB()
+  // Fix: search for supplementId in availableSupplements array
+  const itemsWithSupplement = await db.collection('menu_items')
+    .find({ 'availableSupplements.supplementId': id })
+    .toArray()
+  
+  const breakfastItemsWithSupplement = await db.collection('breakfast_items')
+    .find({ 'availableSupplements.supplementId': id })
+    .toArray()
+  
+  if (itemsWithSupplement.length > 0 || breakfastItemsWithSupplement.length > 0) {
+    throw new Error(`Impossible de supprimer: ${itemsWithSupplement.length + breakfastItemsWithSupplement.length} article(s) utilisent ce supplement`)
+  }
+  
+  await SupplementModel.delete(id)
+}
 }
 
 // ============================================
