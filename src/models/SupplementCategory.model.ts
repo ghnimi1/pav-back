@@ -4,6 +4,7 @@ import { ObjectId, type WithId, type Document } from 'mongodb'
 
 export interface SupplementCategory {
   _id?: string
+  id?: string
   name: string
   color: string
   isActive: boolean

@@ -3,6 +3,7 @@ import { ObjectId, type Document, type WithId } from 'mongodb'
 
 export interface BreakfastCategory {
   _id?: string
+  id?: string
   name: string
   icon: string
   description?: string

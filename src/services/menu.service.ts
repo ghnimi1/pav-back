@@ -328,29 +328,27 @@ export class BreakfastItemService {
   }
 
   async createItem(data: CreateBreakfastItemInput): Promise<BreakfastItem> {
-    const category = await BreakfastCategoryModel.findById(data.categoryId)
+    const category = await BreakfastCategoryModel.findById(data.categoryId as string)
     if (!category) {
-      throw new Error('CatÃ©gorie petit dÃ©jeuner non trouvÃ©e')
+      throw new Error('Catégorie petit déjeuner non trouvée')
     }
     return BreakfastItemModel.create(data)
   }
 
- async updateItem(id: string, data: Partial<BreakfastItem>): Promise<void> {
+  async updateItem(id: string, data: Partial<BreakfastItem>): Promise<void> {
     const item = await BreakfastItemModel.findById(id)
     if (!item) {
       throw new Error('Article petit déjeuner non trouvé')
     }
     
-    // Nettoyer les données pour éviter de modifier _id
     const { _id, id: _, ...cleanData } = data as any
-    
     await BreakfastItemModel.update(id, cleanData)
   }
 
   async deleteItem(id: string): Promise<void> {
     const item = await BreakfastItemModel.findById(id)
     if (!item) {
-      throw new Error('Article petit dÃ©jeuner non trouvÃ©')
+      throw new Error('Article petit déjeuner non trouvé')
     }
     await BreakfastItemModel.delete(id)
   }

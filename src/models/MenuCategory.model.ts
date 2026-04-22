@@ -3,6 +3,7 @@ import { ObjectId, type WithId, type Document } from 'mongodb'
 
 export interface MenuCategory {
   _id?: string
+  id?: string
   name: string
   slug: string
   icon?: string

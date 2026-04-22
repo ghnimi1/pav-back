@@ -16,6 +16,7 @@ export interface MenuPromotion {
 
 export interface MenuItem {
   _id?: string
+  id?: string
   name: string
   description: string
   price: number

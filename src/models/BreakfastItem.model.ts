@@ -2,7 +2,7 @@ import { getDB } from '../config/database'
 import { ObjectId, type Document, type WithId } from 'mongodb'
 
 export interface BreakfastSupplementConfig {
-  supplementId: string
+  supplementId: string | ObjectId
   isEnabled: boolean
   customPrice?: number
 }
@@ -13,7 +13,7 @@ export interface BreakfastItem {
   description?: string
   price: number
   points?: number
-  categoryId: ObjectId | string  // Can be ObjectId in DB, string when returned
+  categoryId: ObjectId | string
   image?: string
   isAvailable: boolean
   isRequired?: boolean
@@ -29,7 +29,7 @@ export interface CreateBreakfastItemInput {
   description?: string
   price: number
   points?: number
-  categoryId: string | ObjectId  // Accept both string and ObjectId
+  categoryId: string | ObjectId
   image?: string
   isAvailable?: boolean
   isRequired?: boolean
@@ -38,8 +38,28 @@ export interface CreateBreakfastItemInput {
   availableSupplements?: BreakfastSupplementConfig[]
 }
 
+function normalizeSupplementId(supp: BreakfastSupplementConfig): BreakfastSupplementConfig {
+  return {
+    ...supp,
+    supplementId: typeof supp.supplementId === 'string' && ObjectId.isValid(supp.supplementId)
+      ? new ObjectId(supp.supplementId)
+      : supp.supplementId
+  }
+}
+
 function toBreakfastItem(doc: WithId<Document> | null): BreakfastItem | null {
   if (!doc) return null
+
+  // Convert ObjectId supplementId back to string for frontend
+  let availableSupplements = doc.availableSupplements || []
+  if (Array.isArray(availableSupplements)) {
+    availableSupplements = availableSupplements.map((supp: any) => ({
+      ...supp,
+      supplementId: supp.supplementId instanceof ObjectId 
+        ? supp.supplementId.toString() 
+        : supp.supplementId
+    }))
+  }
 
   return {
     _id: doc._id.toString(),
@@ -47,13 +67,13 @@ function toBreakfastItem(doc: WithId<Document> | null): BreakfastItem | null {
     description: doc.description,
     price: doc.price,
     points: doc.points,
-    categoryId: doc.categoryId instanceof ObjectId ? doc.categoryId.toString() : doc.categoryId, // Convert ObjectId to string for client
+    categoryId: doc.categoryId instanceof ObjectId ? doc.categoryId.toString() : doc.categoryId,
     image: doc.image,
     isAvailable: doc.isAvailable ?? true,
     isRequired: doc.isRequired,
     minQuantity: doc.minQuantity,
     maxQuantity: doc.maxQuantity,
-    availableSupplements: doc.availableSupplements,
+    availableSupplements: availableSupplements,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   }
@@ -66,23 +86,33 @@ export const BreakfastItemModel = {
     const db = getDB()
     const now = new Date()
 
-    // Convert categoryId to ObjectId if it's a string
     const categoryIdObj = typeof input.categoryId === 'string' 
       ? new ObjectId(input.categoryId) 
       : input.categoryId
+
+    // Convert supplement IDs to ObjectId
+    let availableSupplements = undefined
+    if (input.availableSupplements && Array.isArray(input.availableSupplements)) {
+      availableSupplements = input.availableSupplements.map(supp => ({
+        ...supp,
+        supplementId: typeof supp.supplementId === 'string' && ObjectId.isValid(supp.supplementId)
+          ? new ObjectId(supp.supplementId)
+          : supp.supplementId
+      }))
+    }
 
     const newItem: Omit<BreakfastItem, '_id'> = {
       name: input.name,
       description: input.description,
       price: input.price,
       points: input.points,
-      categoryId: categoryIdObj, // Store as ObjectId
+      categoryId: categoryIdObj,
       image: input.image,
       isAvailable: input.isAvailable !== false,
       isRequired: input.isRequired,
       minQuantity: input.minQuantity,
       maxQuantity: input.maxQuantity,
-      availableSupplements: input.availableSupplements,
+      availableSupplements: availableSupplements,
       createdAt: now,
       updatedAt: now,
     }
@@ -91,7 +121,8 @@ export const BreakfastItemModel = {
     return { 
       _id: result.insertedId.toString(), 
       ...newItem,
-      categoryId: categoryIdObj.toString() // Convert to string for return
+      categoryId: categoryIdObj.toString(),
+      availableSupplements: input.availableSupplements // Return original string IDs
     }
   },
 
@@ -109,7 +140,6 @@ export const BreakfastItemModel = {
 
   async findByCategory(categoryId: string): Promise<BreakfastItem[]> {
     const db = getDB()
-    // Convert string categoryId to ObjectId for query
     const categoryIdObj = new ObjectId(categoryId)
     const docs = await db.collection(this.collection).find({ categoryId: categoryIdObj }).sort({ name: 1 }).toArray()
     return docs.map((doc) => toBreakfastItem(doc)!).filter(Boolean)
@@ -124,16 +154,42 @@ export const BreakfastItemModel = {
 
   async update(id: string, updates: Partial<BreakfastItem>): Promise<void> {
     const db = getDB()
-    const { _id, id: ignoreId, createdAt, categoryId, ...safeUpdates } = updates
+    if (!ObjectId.isValid(id)) {
+      throw new Error('ID invalide')
+    }
+
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates
     
-    // Prepare update object
-    const updateData: any = { ...safeUpdates, updatedAt: new Date() }
+    const updateData: any = { updatedAt: new Date() }
     
-    // If categoryId is provided, convert it to ObjectId
-    if (categoryId) {
-      updateData.categoryId = typeof categoryId === 'string' 
-        ? new ObjectId(categoryId) 
-        : categoryId
+    if (safeUpdates.name !== undefined) updateData.name = safeUpdates.name
+    if (safeUpdates.description !== undefined) updateData.description = safeUpdates.description
+    if (safeUpdates.price !== undefined) updateData.price = safeUpdates.price
+    if (safeUpdates.points !== undefined) updateData.points = safeUpdates.points
+    if (safeUpdates.image !== undefined) updateData.image = safeUpdates.image
+    if (safeUpdates.isAvailable !== undefined) updateData.isAvailable = safeUpdates.isAvailable
+    if (safeUpdates.isRequired !== undefined) updateData.isRequired = safeUpdates.isRequired
+    if (safeUpdates.minQuantity !== undefined) updateData.minQuantity = safeUpdates.minQuantity
+    if (safeUpdates.maxQuantity !== undefined) updateData.maxQuantity = safeUpdates.maxQuantity
+    
+    // Convert supplement IDs to ObjectId for storage
+    if (safeUpdates.availableSupplements !== undefined) {
+      if (Array.isArray(safeUpdates.availableSupplements)) {
+        updateData.availableSupplements = safeUpdates.availableSupplements.map((supp: any) => ({
+          ...supp,
+          supplementId: typeof supp.supplementId === 'string' && ObjectId.isValid(supp.supplementId)
+            ? new ObjectId(supp.supplementId)
+            : supp.supplementId
+        }))
+      } else {
+        updateData.availableSupplements = safeUpdates.availableSupplements
+      }
+    }
+    
+    if (safeUpdates.categoryId !== undefined && safeUpdates.categoryId !== null) {
+      updateData.categoryId = typeof safeUpdates.categoryId === 'string' 
+        ? new ObjectId(safeUpdates.categoryId) 
+        : safeUpdates.categoryId
     }
     
     await db.collection(this.collection).updateOne(

@@ -5,6 +5,7 @@ export type BreakfastFormulaType = 'normal' | 'healthy'
 
 export interface BreakfastFormula {
   _id?: string
+  id?: string
   name: string
   description: string
   price: number

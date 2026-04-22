@@ -43,7 +43,7 @@ router.put('/supplement-categories/:id', adminOnly, MenuController.updateSupplem
 router.delete('/supplement-categories/:id', adminOnly, MenuController.deleteSupplementCategory)
 
 // Supplements (admin only)
-router.get('/supplements/all', adminOnly, MenuController.getAllSupplements)
+router.get('/supplements/all', MenuController.getAllSupplements)
 router.get('/supplements/:id', adminOnly, MenuController.getSupplementById)
 router.post('/supplements', adminOnly, MenuController.createSupplement)
 router.put('/supplements/:id', adminOnly, MenuController.updateSupplement)

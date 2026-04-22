@@ -74,19 +74,44 @@ function parseBreakfastItemPayload(req: Request) {
   const imageFromUpload = getUploadedImagePath(req.file)
   const removeImage = parseBoolean(body.removeImage) === true
 
-  return {
-    name: typeof body.name === 'string' ? body.name : undefined,
-    description: typeof body.description === 'string' ? body.description : undefined,
-    price: parseNumber(body.price),
-    points: parseNumber(body.points),
-    categoryId: typeof body.categoryId === 'string' ? body.categoryId : undefined,
-    image: removeImage ? undefined : imageFromUpload || (typeof body.image === 'string' && body.image.trim() ? body.image : undefined),
-    isAvailable: parseBoolean(body.isAvailable),
-    isRequired: parseBoolean(body.isRequired),
-    minQuantity: parseNumber(body.minQuantity),
-    maxQuantity: parseNumber(body.maxQuantity),
-    availableSupplements: parseJsonField(body.availableSupplements, undefined),
+  let availableSupplements = undefined
+  if (body.availableSupplements !== undefined && body.availableSupplements !== null && body.availableSupplements !== '') {
+    try {
+      if (typeof body.availableSupplements === 'string') {
+        availableSupplements = JSON.parse(body.availableSupplements)
+      } else {
+        availableSupplements = body.availableSupplements
+      }
+    } catch (e) {
+      console.error('Failed to parse availableSupplements:', e)
+      availableSupplements = undefined
+    }
   }
+
+  // Construire l'objet en excluant les champs undefined
+  const result: any = {}
+  
+  if (body.name !== undefined && body.name !== null && body.name !== '') result.name = body.name
+  if (body.description !== undefined && body.description !== null) result.description = body.description
+  if (body.price !== undefined && body.price !== null) result.price = parseNumber(body.price)
+  if (body.points !== undefined && body.points !== null) result.points = parseNumber(body.points)
+  if (body.categoryId !== undefined && body.categoryId !== null && body.categoryId !== '') result.categoryId = body.categoryId
+  if (body.isAvailable !== undefined && body.isAvailable !== null) result.isAvailable = parseBoolean(body.isAvailable)
+  if (body.isRequired !== undefined && body.isRequired !== null) result.isRequired = parseBoolean(body.isRequired)
+  if (body.minQuantity !== undefined && body.minQuantity !== null) result.minQuantity = parseNumber(body.minQuantity)
+  if (body.maxQuantity !== undefined && body.maxQuantity !== null) result.maxQuantity = parseNumber(body.maxQuantity)
+  if (availableSupplements !== undefined) result.availableSupplements = availableSupplements
+  
+  // Handle image
+  if (removeImage) {
+    result.image = undefined
+  } else if (imageFromUpload) {
+    result.image = imageFromUpload
+  } else if (body.image !== undefined && body.image !== null && body.image !== '') {
+    result.image = body.image
+  }
+
+  return result
 }
 
 async function removeLocalImageIfNeeded(imagePath?: string) {
@@ -656,30 +681,48 @@ async deleteSupplementCategory(req: Request, res: Response) {
   },
 
   async updateBreakfastItem(req: Request, res: Response) {
-    try {
-      const id = getParamString(req.params.id)
-      if (!id) {
-        return res.status(400).json({ success: false, error: 'ID requis' })
-      }
-
-      const currentItem = await breakfastItemService.getItemById(id)
-      if (!currentItem) {
-        return res.status(404).json({ success: false, error: 'Article petit dejeuner non trouve' })
-      }
-
-      const payload = parseBreakfastItemPayload(req)
-      await breakfastItemService.updateItem(id, payload)
-
-      if ((req.file || parseBoolean((req.body as Record<string, unknown>).removeImage) === true) && currentItem.image !== payload.image) {
-        await removeLocalImageIfNeeded(currentItem.image)
-      }
-
-      res.json({ success: true, message: 'Article petit dejeuner mis a jour avec succes' })
-    } catch (error: any) {
-      console.error('Update breakfast item error:', error)
-      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la mise a jour' })
+  try {
+    const id = getParamString(req.params.id)
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID requis' })
     }
-  },
+
+    const currentItem = await breakfastItemService.getItemById(id)
+    if (!currentItem) {
+      return res.status(404).json({ success: false, error: 'Article petit dejeuner non trouve' })
+    }
+
+    const payload = parseBreakfastItemPayload(req)
+    
+    // Merge with current item to preserve existing values
+    const mergedPayload = {
+      name: payload.name ?? currentItem.name,
+      description: payload.description ?? currentItem.description,
+      price: payload.price ?? currentItem.price,
+      points: payload.points ?? currentItem.points,
+      categoryId: payload.categoryId ?? currentItem.categoryId,
+      image: payload.image !== undefined ? payload.image : currentItem.image,
+      isAvailable: payload.isAvailable ?? currentItem.isAvailable,
+      isRequired: payload.isRequired ?? currentItem.isRequired,
+      minQuantity: payload.minQuantity ?? currentItem.minQuantity,
+      maxQuantity: payload.maxQuantity ?? currentItem.maxQuantity,
+      availableSupplements: payload.availableSupplements !== undefined 
+        ? payload.availableSupplements 
+        : currentItem.availableSupplements,
+    }
+    
+    await breakfastItemService.updateItem(id, mergedPayload)
+
+    if ((req.file || parseBoolean((req.body as Record<string, unknown>).removeImage) === true) && currentItem.image !== mergedPayload.image) {
+      await removeLocalImageIfNeeded(currentItem.image)
+    }
+
+    res.json({ success: true, message: 'Article petit dejeuner mis a jour avec succes' })
+  } catch (error: any) {
+    console.error('Update breakfast item error:', error)
+    res.status(400).json({ success: false, error: error.message || 'Erreur lors de la mise a jour' })
+  }
+},
 
   async deleteBreakfastItem(req: Request, res: Response) {
     try {

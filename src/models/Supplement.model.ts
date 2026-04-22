@@ -3,6 +3,7 @@ import { ObjectId, type WithId, type Document } from 'mongodb'
 
 export interface Supplement {
   _id?: string
+  id?: string
   name: string
   price: number
   points?: number
