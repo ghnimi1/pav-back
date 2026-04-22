@@ -301,7 +301,86 @@ export const MenuController = {
       res.status(400).json({ success: false, error: error.message || 'Erreur lors de la modification' })
     }
   },
+// Ajouter après les méthodes des suppléments
 
+async getAllSupplementCategories(_req: Request, res: Response) {
+  try {
+    const categories = await supplementCategoryService.getAllCategories()
+    res.json({ success: true, data: categories })
+  } catch (error) {
+    console.error('Get all supplement categories error:', error)
+    res.status(500).json({ success: false, error: 'Erreur lors de la récupération' })
+  }
+},
+
+async getActiveSupplementCategories(_req: Request, res: Response) {
+  try {
+    const categories = await supplementCategoryService.getActiveCategories()
+    res.json({ success: true, data: categories })
+  } catch (error) {
+    console.error('Get active supplement categories error:', error)
+    res.status(500).json({ success: false, error: 'Erreur lors de la récupération' })
+  }
+},
+
+async getSupplementCategoryById(req: Request, res: Response) {
+  try {
+    const id = getParamString(req.params.id)
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID requis' })
+    }
+
+    const category = await supplementCategoryService.getCategoryById(id)
+    if (!category) {
+      return res.status(404).json({ success: false, error: 'Catégorie non trouvée' })
+    }
+
+    res.json({ success: true, data: category })
+  } catch (error) {
+    console.error('Get supplement category by id error:', error)
+    res.status(500).json({ success: false, error: 'Erreur lors de la récupération' })
+  }
+},
+
+async createSupplementCategory(req: Request, res: Response) {
+  try {
+    const category = await supplementCategoryService.createCategory(req.body)
+    res.status(201).json({ success: true, data: category, message: 'Catégorie créée avec succès' })
+  } catch (error: any) {
+    console.error('Create supplement category error:', error)
+    res.status(400).json({ success: false, error: error.message || 'Erreur lors de la création' })
+  }
+},
+
+async updateSupplementCategory(req: Request, res: Response) {
+  try {
+    const id = getParamString(req.params.id)
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID requis' })
+    }
+
+    await supplementCategoryService.updateCategory(id, req.body)
+    res.json({ success: true, message: 'Catégorie mise à jour avec succès' })
+  } catch (error: any) {
+    console.error('Update supplement category error:', error)
+    res.status(400).json({ success: false, error: error.message || 'Erreur lors de la mise à jour' })
+  }
+},
+
+async deleteSupplementCategory(req: Request, res: Response) {
+  try {
+    const id = getParamString(req.params.id)
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID requis' })
+    }
+
+    await supplementCategoryService.deleteCategory(id)
+    res.json({ success: true, message: 'Catégorie supprimée avec succès' })
+  } catch (error: any) {
+    console.error('Delete supplement category error:', error)
+    res.status(400).json({ success: false, error: error.message || 'Erreur lors de la suppression' })
+  }
+},
   async getAllSupplements(_req: Request, res: Response) {
     try {
       const supplements = await supplementService.getAllSupplements()

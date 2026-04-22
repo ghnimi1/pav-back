@@ -34,6 +34,14 @@ router.put('/items/:id', adminOnly, uploadMenuImage.single('imageFile'), MenuCon
 router.delete('/items/:id', adminOnly, MenuController.deleteItem)
 router.patch('/items/:id/toggle', adminOnly, MenuController.toggleAvailability)
 
+// Supplement Categories routes
+router.get('/supplement-categories', adminOnly, MenuController.getAllSupplementCategories)
+router.get('/supplement-categories/active', MenuController.getActiveSupplementCategories)
+router.get('/supplement-categories/:id', adminOnly, MenuController.getSupplementCategoryById)
+router.post('/supplement-categories', adminOnly, MenuController.createSupplementCategory)
+router.put('/supplement-categories/:id', adminOnly, MenuController.updateSupplementCategory)
+router.delete('/supplement-categories/:id', adminOnly, MenuController.deleteSupplementCategory)
+
 // Supplements (admin only)
 router.get('/supplements/all', adminOnly, MenuController.getAllSupplements)
 router.get('/supplements/:id', adminOnly, MenuController.getSupplementById)

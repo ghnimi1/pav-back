@@ -12,6 +12,7 @@ import type { Offer, CreateOfferInput } from '../models/Offer.model'
 import type { BreakfastCategory, CreateBreakfastCategoryInput } from '../models/BreakfastCategory.model'
 import type { BreakfastItem, CreateBreakfastItemInput } from '../models/BreakfastItem.model'
 import type { BreakfastFormula } from '../models/BreakfastFormula.model'
+import { SupplementCategoryModel, type CreateSupplementCategoryInput, type SupplementCategory } from '../models/SupplementCategory.model'
 
 // ============================================
 // MENU CATEGORY SERVICE
@@ -125,7 +126,51 @@ export class MenuItemService {
 // ============================================
 // SUPPLEMENT SERVICE
 // ============================================
+export class SupplementCategoryService {
+  async getAllCategories(): Promise<SupplementCategory[]> {
+    return SupplementCategoryModel.findAll()
+  }
+  
+  async getActiveCategories(): Promise<SupplementCategory[]> {
+    return SupplementCategoryModel.findActive()
+  }
+  
+  async getCategoryById(id: string): Promise<SupplementCategory | null> {
+    return SupplementCategoryModel.findById(id)
+  }
+  
+  async createCategory(data: CreateSupplementCategoryInput): Promise<SupplementCategory> {
+    const existing = (await SupplementCategoryModel.findAll()).find(c => c.name === data.name)
+    if (existing) {
+      throw new Error('Une catégorie avec ce nom existe déjà')
+    }
+    return SupplementCategoryModel.create(data)
+  }
+  
+  async updateCategory(id: string, data: Partial<SupplementCategory>): Promise<void> {
+    const category = await SupplementCategoryModel.findById(id)
+    if (!category) {
+      throw new Error('Catégorie non trouvée')
+    }
+    await SupplementCategoryModel.update(id, data)
+  }
+  
+  async deleteCategory(id: string): Promise<void> {
+    const category = await SupplementCategoryModel.findById(id)
+    if (!category) {
+      throw new Error('Catégorie non trouvée')
+    }
+    
+    const supplementsCount = await SupplementCategoryModel.getSupplementsCount(id)
+    if (supplementsCount > 0) {
+      throw new Error(`Impossible de supprimer: ${supplementsCount} supplément(s) utilisent cette catégorie`)
+    }
+    
+    await SupplementCategoryModel.delete(id)
+  }
+}
 
+export const supplementCategoryService = new SupplementCategoryService()
 export class SupplementService {
   async getAllSupplements(): Promise<Supplement[]> {
     return SupplementModel.findAll()
