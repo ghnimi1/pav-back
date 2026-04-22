@@ -14,6 +14,7 @@ export interface OfferItem {
 
 export interface Offer {
   _id?: string
+  id?: string
   name: string
   description: string
   image?: string

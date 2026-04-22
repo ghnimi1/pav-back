@@ -7,6 +7,7 @@ export type ProductionStatus = 'planned' | 'in-progress' | 'completed' | 'cancel
 
 export interface ProductionOrder {
   _id?: string
+  id?: string
   recipeId: string
   showcaseId: string
   quantity: number
