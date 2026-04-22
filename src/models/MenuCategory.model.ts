@@ -104,9 +104,10 @@ export const MenuCategoryModel = {
   
   async update(id: string, updates: Partial<MenuCategory>): Promise<void> {
     const db = getDB()
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates
     await db.collection('menu_categories').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updates, updatedAt: new Date() } }
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
     )
   },
   

@@ -150,9 +150,10 @@ export const OfferModel = {
   
   async update(id: string, updates: Partial<Offer>): Promise<void> {
     const db = getDB()
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates
     await db.collection('offers').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updates, updatedAt: new Date() } }
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
     )
   },
   

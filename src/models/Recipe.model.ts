@@ -108,9 +108,10 @@ export const RecipeModel = {
   
   async update(id: string, updates: Partial<Recipe>): Promise<void> {
     const db = getDB()
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates
     await db.collection('recipes').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updates, updatedAt: new Date() } }
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
     )
   },
   

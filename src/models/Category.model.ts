@@ -111,11 +111,11 @@ export const CategoryModel = {
     const db = getDB()
     if (!ObjectId.isValid(id)) throw new Error('ID invalide')
     
-    const { _id, ...updateData } = updates as any
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates as any
     
     await db.collection('categories').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updateData, updatedAt: new Date() } }
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
     )
   },
   

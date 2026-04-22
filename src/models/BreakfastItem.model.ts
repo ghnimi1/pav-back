@@ -13,7 +13,7 @@ export interface BreakfastItem {
   description?: string
   price: number
   points?: number
-  categoryId: string
+  categoryId: ObjectId | string  // Can be ObjectId in DB, string when returned
   image?: string
   isAvailable: boolean
   isRequired?: boolean
@@ -29,7 +29,7 @@ export interface CreateBreakfastItemInput {
   description?: string
   price: number
   points?: number
-  categoryId: string
+  categoryId: string | ObjectId  // Accept both string and ObjectId
   image?: string
   isAvailable?: boolean
   isRequired?: boolean
@@ -47,7 +47,7 @@ function toBreakfastItem(doc: WithId<Document> | null): BreakfastItem | null {
     description: doc.description,
     price: doc.price,
     points: doc.points,
-    categoryId: doc.categoryId,
+    categoryId: doc.categoryId instanceof ObjectId ? doc.categoryId.toString() : doc.categoryId, // Convert ObjectId to string for client
     image: doc.image,
     isAvailable: doc.isAvailable ?? true,
     isRequired: doc.isRequired,
@@ -66,12 +66,17 @@ export const BreakfastItemModel = {
     const db = getDB()
     const now = new Date()
 
+    // Convert categoryId to ObjectId if it's a string
+    const categoryIdObj = typeof input.categoryId === 'string' 
+      ? new ObjectId(input.categoryId) 
+      : input.categoryId
+
     const newItem: Omit<BreakfastItem, '_id'> = {
       name: input.name,
       description: input.description,
       price: input.price,
       points: input.points,
-      categoryId: input.categoryId,
+      categoryId: categoryIdObj, // Store as ObjectId
       image: input.image,
       isAvailable: input.isAvailable !== false,
       isRequired: input.isRequired,
@@ -83,7 +88,11 @@ export const BreakfastItemModel = {
     }
 
     const result = await db.collection(this.collection).insertOne(newItem)
-    return { _id: result.insertedId.toString(), ...newItem }
+    return { 
+      _id: result.insertedId.toString(), 
+      ...newItem,
+      categoryId: categoryIdObj.toString() // Convert to string for return
+    }
   },
 
   async findAll(): Promise<BreakfastItem[]> {
@@ -100,7 +109,9 @@ export const BreakfastItemModel = {
 
   async findByCategory(categoryId: string): Promise<BreakfastItem[]> {
     const db = getDB()
-    const docs = await db.collection(this.collection).find({ categoryId }).sort({ name: 1 }).toArray()
+    // Convert string categoryId to ObjectId for query
+    const categoryIdObj = new ObjectId(categoryId)
+    const docs = await db.collection(this.collection).find({ categoryId: categoryIdObj }).sort({ name: 1 }).toArray()
     return docs.map((doc) => toBreakfastItem(doc)!).filter(Boolean)
   },
 
@@ -113,9 +124,21 @@ export const BreakfastItemModel = {
 
   async update(id: string, updates: Partial<BreakfastItem>): Promise<void> {
     const db = getDB()
+    const { _id, id: ignoreId, createdAt, categoryId, ...safeUpdates } = updates
+    
+    // Prepare update object
+    const updateData: any = { ...safeUpdates, updatedAt: new Date() }
+    
+    // If categoryId is provided, convert it to ObjectId
+    if (categoryId) {
+      updateData.categoryId = typeof categoryId === 'string' 
+        ? new ObjectId(categoryId) 
+        : categoryId
+    }
+    
     await db.collection(this.collection).updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updates, updatedAt: new Date() } }
+      { $set: updateData }
     )
   },
 

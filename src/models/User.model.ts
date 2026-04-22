@@ -165,11 +165,11 @@ export const UserModel = {
       }
     }
     
-    const { _id, ...updateData } = updates as any
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates as any
     
     await db.collection('users').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updateData, updatedAt: new Date() } }
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
     )
   },
   

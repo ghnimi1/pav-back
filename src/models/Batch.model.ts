@@ -140,11 +140,11 @@ export const BatchModel = {
     const db = getDB()
     if (!ObjectId.isValid(id)) throw new Error('ID invalide')
     
-    const { _id, ...updateData } = updates as any
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates as any
     
     await db.collection('batches').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updateData, updatedAt: new Date() } }
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
     )
   },
   

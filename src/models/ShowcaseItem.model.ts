@@ -125,9 +125,10 @@ export const ShowcaseItemModel = {
   
   async update(id: string, updates: Partial<ShowcaseItem>): Promise<void> {
     const db = getDB()
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates
     await db.collection('showcase_items').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...updates, updatedAt: new Date() } }
+      { $set: { ...safeUpdates, updatedAt: new Date() } }
     )
   },
   
