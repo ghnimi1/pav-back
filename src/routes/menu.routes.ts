@@ -69,7 +69,8 @@ router.put('/breakfast/items/:id', adminOnly, uploadMenuImage.single('imageFile'
 router.delete('/breakfast/items/:id', adminOnly, MenuController.deleteBreakfastItem)
 
 router.get('/breakfast/formulas/all', adminOnly, MenuController.getAllBreakfastFormulas)
-router.post('/breakfast/formulas', adminOnly, MenuController.createBreakfastFormula)
-router.put('/breakfast/formulas/:id', adminOnly, MenuController.updateBreakfastFormula)
+router.post('/breakfast/formulas', adminOnly, uploadMenuImage.single('imageFile'), MenuController.createBreakfastFormula)
+router.put('/breakfast/formulas/:id', adminOnly, uploadMenuImage.single('imageFile'), MenuController.updateBreakfastFormula)
+router.delete('/breakfast/formulas/:id', adminOnly, MenuController.deleteBreakfastFormula)
 
 export default router

@@ -126,6 +126,30 @@ function parseBreakfastItemPayload(req: Request) {
   return result
 }
 
+function parseBreakfastFormulaPayload(req: Request) {
+  const body = req.body as Record<string, unknown>
+  const imageFromUpload = getUploadedImagePath(req.file)
+  const removeImage = parseBoolean(body.removeImage) === true
+  const result: any = {}
+
+  if (typeof body.name === 'string' && body.name.trim() !== '') result.name = body.name
+  if (typeof body.description === 'string') result.description = body.description
+  if (body.price !== undefined && body.price !== null && body.price !== '') result.price = parseNumber(body.price)
+  if (body.points !== undefined && body.points !== null && body.points !== '') result.points = parseNumber(body.points)
+  if (typeof body.type === 'string' && body.type.trim() !== '') result.type = body.type
+  if (body.isActive !== undefined && body.isActive !== null) result.isActive = parseBoolean(body.isActive)
+
+  if (removeImage) {
+    result.image = undefined
+  } else if (imageFromUpload) {
+    result.image = imageFromUpload
+  } else if (typeof body.image === 'string' && body.image.trim() !== '') {
+    result.image = body.image
+  }
+
+  return result
+}
+
 async function removeLocalImageIfNeeded(imagePath?: string) {
   const absolutePath = getLocalUploadAbsolutePath(imagePath)
   if (!absolutePath) return
@@ -793,7 +817,7 @@ async deleteSupplementCategory(req: Request, res: Response) {
 
   async createBreakfastFormula(req: Request, res: Response) {
     try {
-      const formula = await breakfastFormulaService.createFormula(req.body)
+      const formula = await breakfastFormulaService.createFormula(parseBreakfastFormulaPayload(req))
       res.status(201).json({ success: true, data: formula, message: 'Formule petit dejeuner creee avec succes' })
     } catch (error: any) {
       console.error('Create breakfast formula error:', error)
@@ -808,11 +832,50 @@ async deleteSupplementCategory(req: Request, res: Response) {
         return res.status(400).json({ success: false, error: 'ID requis' })
       }
 
-      await breakfastFormulaService.updateFormula(id, req.body)
+      const currentFormula = await breakfastFormulaService.getFormulaById(id)
+      if (!currentFormula) {
+        return res.status(404).json({ success: false, error: 'Formule petit dejeuner non trouvee' })
+      }
+
+      const payload = parseBreakfastFormulaPayload(req)
+      const mergedPayload = {
+        name: payload.name ?? currentFormula.name,
+        description: payload.description ?? currentFormula.description,
+        price: payload.price ?? currentFormula.price,
+        points: payload.points ?? currentFormula.points,
+        type: payload.type ?? currentFormula.type,
+        image: payload.image !== undefined ? payload.image : currentFormula.image,
+        isActive: payload.isActive ?? currentFormula.isActive,
+      }
+
+      await breakfastFormulaService.updateFormula(id, mergedPayload)
+
+      if ((req.file || parseBoolean((req.body as Record<string, unknown>).removeImage) === true) && currentFormula.image !== mergedPayload.image) {
+        await removeLocalImageIfNeeded(currentFormula.image)
+      }
+
       res.json({ success: true, message: 'Formule petit dejeuner mise a jour avec succes' })
     } catch (error: any) {
       console.error('Update breakfast formula error:', error)
       res.status(400).json({ success: false, error: error.message || 'Erreur lors de la mise a jour' })
+    }
+  },
+
+  async deleteBreakfastFormula(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+
+      const currentFormula = await breakfastFormulaService.getFormulaById(id)
+      await breakfastFormulaService.deleteFormula(id)
+      await removeLocalImageIfNeeded(currentFormula?.image)
+
+      res.json({ success: true, message: 'Formule petit dejeuner supprimee avec succes' })
+    } catch (error: any) {
+      console.error('Delete breakfast formula error:', error)
+      res.status(400).json({ success: false, error: error.message || 'Erreur lors de la suppression' })
     }
   },
 }

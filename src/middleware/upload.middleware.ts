@@ -46,6 +46,9 @@ export function getUploadedImagePath(file?: Express.Multer.File) {
 }
 
 export function getLocalUploadAbsolutePath(imagePath?: string) {
-  if (!imagePath || !imagePath.startsWith('/uploads/')) return null
-  return path.join(process.cwd(), imagePath.replace(/^\//, '').replace(/\//g, path.sep))
+  if (!imagePath) return null
+  if (imagePath.startsWith('/uploads/')) {
+    return path.join(process.cwd(), imagePath.replace(/^\//, '').replace(/\//g, path.sep))
+  }
+  return path.join(uploadsDir, imagePath)
 }

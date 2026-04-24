@@ -372,10 +372,10 @@ export class BreakfastFormulaService {
   }
 
   async createFormula(data: Omit<BreakfastFormula, '_id' | 'createdAt' | 'updatedAt'>): Promise<BreakfastFormula> {
-    const existing = await BreakfastFormulaModel.findByType(data.type)
+/*     const existing = await BreakfastFormulaModel.findByType(data.type)
     if (existing) {
       throw new Error('Une formule de ce type existe dÃ©jÃ ')
-    }
+    } */
     return BreakfastFormulaModel.create(data)
   }
 
@@ -385,6 +385,14 @@ export class BreakfastFormulaService {
       throw new Error('Formule petit dÃ©jeuner non trouvÃ©e')
     }
     await BreakfastFormulaModel.update(id, data)
+  }
+
+  async deleteFormula(id: string): Promise<void> {
+    const formula = await BreakfastFormulaModel.findById(id)
+    if (!formula) {
+      throw new Error('Formule petit dejeuner non trouvee')
+    }
+    await BreakfastFormulaModel.delete(id)
   }
 }
 
