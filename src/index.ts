@@ -18,7 +18,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Middlewares
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001',"https://pav-back.onrender.com"],
+  origin: ['http://localhost:3000', 'http://localhost:3001',"https://pav-front-53kzzb0ns-ghnimi1s-projects.vercel.app"],
   credentials: true
 }))
 app.use(express.json({ limit: '10mb' }))
