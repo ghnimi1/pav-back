@@ -5,6 +5,7 @@ import { ObjectId, type WithId, type Document } from 'mongodb'
 
 export interface RecipeCategory {
   _id?: string
+  id?: string
   name: string
   icon: string
   color: string

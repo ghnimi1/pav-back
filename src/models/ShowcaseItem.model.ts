@@ -7,6 +7,7 @@ export type ShowcaseItemStatus = 'available' | 'low' | 'expired' | 'sold-out'
 
 export interface ShowcaseItem {
   _id?: string
+  id?: string
   recipeId: string
   productionOrderId: string
   showcaseId: string

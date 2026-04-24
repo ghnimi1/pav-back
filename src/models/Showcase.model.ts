@@ -7,6 +7,7 @@ export type ShowcaseType = 'refrigerated' | 'ambient' | 'frozen' | 'heated'
 
 export interface Showcase {
   _id?: string
+  id?: string
   name: string
   type: ShowcaseType
   temperature?: string

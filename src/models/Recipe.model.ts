@@ -11,6 +11,7 @@ export interface RecipeIngredient {
 
 export interface Recipe {
   _id?: string
+  id?: string
   name: string
   description?: string
   categoryId: string

@@ -314,7 +314,7 @@ export const MenuController = {
       await menuItemService.updateItem(id, mergedPayload)
 
       if ((req.file || parseBoolean((req.body as Record<string, unknown>).removeImage) === true) && currentItem.image !== mergedPayload.image) {
-        await removeLocalImageIfNeeded(currentItem.image)
+        await removeLocalImageIfNeeded(currentItem.image!)
       }
 
       res.json({ success: true, message: 'Article mis a jour avec succes' })
@@ -333,7 +333,7 @@ export const MenuController = {
 
       const currentItem = await menuItemService.getItemById(id)
       await menuItemService.deleteItem(id)
-      await removeLocalImageIfNeeded(currentItem?.image)
+      await removeLocalImageIfNeeded(currentItem?.image!)
 
       res.json({ success: true, message: 'Article supprime avec succes' })
     } catch (error: any) {

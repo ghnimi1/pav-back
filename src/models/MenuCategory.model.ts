@@ -90,7 +90,7 @@ export const MenuCategoryModel = {
     return docs.map(doc => toMenuCategory(doc)!).filter(c => c !== null)
   },
   
-  async findById(id: string): Promise<MenuCategory | null> {
+  async findById(id: string| ObjectId): Promise<MenuCategory | null> {
     const db = getDB()
     if (!ObjectId.isValid(id)) return null
     const doc = await db.collection('menu_categories').findOne({ _id: new ObjectId(id) })
