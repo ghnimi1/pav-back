@@ -2,7 +2,7 @@ import { getDB } from '../config/database'
 import { ObjectId, type WithId, type Document } from 'mongodb'
 
 export interface MenuSupplement {
-  supplementId: string
+  supplementId: string | ObjectId
   isEnabled: boolean
   customPrice?: number
 }
@@ -21,12 +21,12 @@ export interface MenuItem {
   description: string
   price: number
   points?: number
-  categoryId: string
-  image?: string
+  categoryId: string | ObjectId
+  image?: string | null
   allergens: string[]
   isAvailable: boolean
   tags?: string[]
-  supplements?: MenuSupplement[]
+  availableSupplements?: MenuSupplement[]
   promotion?: MenuPromotion
   recipeId?: string
   createdAt: Date
@@ -38,30 +38,50 @@ export interface CreateMenuItemInput {
   description: string
   price: number
   points?: number
-  categoryId: string
-  image?: string
+  categoryId: string | ObjectId
+  image?: string | null
   allergens?: string[]
   isAvailable?: boolean
   tags?: string[]
-  supplements?: MenuSupplement[]
+  availableSupplements?: MenuSupplement[]
   promotion?: MenuPromotion
   recipeId?: string
 }
 
+function normalizeSupplementId(supp: MenuSupplement): MenuSupplement {
+  return {
+    ...supp,
+    supplementId: typeof supp.supplementId === 'string' && ObjectId.isValid(supp.supplementId)
+      ? new ObjectId(supp.supplementId)
+      : supp.supplementId,
+  }
+}
+
 function toMenuItem(doc: WithId<Document> | null): MenuItem | null {
   if (!doc) return null
+
+  let availableSupplements = doc.availableSupplements || doc.supplements || []
+  if (Array.isArray(availableSupplements)) {
+    availableSupplements = availableSupplements.map((supp: any) => ({
+      ...supp,
+      supplementId: supp.supplementId instanceof ObjectId
+        ? supp.supplementId.toString()
+        : supp.supplementId,
+    }))
+  }
+
   return {
     _id: doc._id.toString(),
     name: doc.name,
     description: doc.description,
     price: doc.price,
     points: doc.points,
-    categoryId: doc.categoryId,
+    categoryId: doc.categoryId instanceof ObjectId ? doc.categoryId.toString() : doc.categoryId,
     image: doc.image,
     allergens: doc.allergens || [],
     isAvailable: doc.isAvailable ?? true,
     tags: doc.tags,
-    supplements: doc.supplements,
+    availableSupplements,
     promotion: doc.promotion,
     recipeId: doc.recipeId,
     createdAt: doc.createdAt,
@@ -75,18 +95,26 @@ export const MenuItemModel = {
   async create(input: CreateMenuItemInput): Promise<MenuItem> {
     const db = getDB()
     const now = new Date()
-    
+
+    const categoryIdObj = typeof input.categoryId === 'string' && ObjectId.isValid(input.categoryId)
+      ? new ObjectId(input.categoryId)
+      : input.categoryId
+
+    const availableSupplements = Array.isArray(input.availableSupplements)
+      ? input.availableSupplements.map(normalizeSupplementId)
+      : undefined
+
     const newItem: Omit<MenuItem, '_id'> = {
       name: input.name,
       description: input.description,
       price: input.price,
       points: input.points,
-      categoryId: input.categoryId,
+      categoryId: categoryIdObj,
       image: input.image,
       allergens: input.allergens || [],
       isAvailable: input.isAvailable !== false,
       tags: input.tags,
-      supplements: input.supplements,
+      availableSupplements,
       promotion: input.promotion,
       recipeId: input.recipeId,
       createdAt: now,
@@ -94,7 +122,12 @@ export const MenuItemModel = {
     }
     
     const result = await db.collection('menu_items').insertOne(newItem)
-    return { _id: result.insertedId.toString(), ...newItem }
+    return {
+      _id: result.insertedId.toString(),
+      ...newItem,
+      categoryId: typeof categoryIdObj === 'string' ? categoryIdObj : categoryIdObj.toString(),
+      availableSupplements: input.availableSupplements,
+    }
   },
   
   async findAll(): Promise<MenuItem[]> {
@@ -117,8 +150,9 @@ export const MenuItemModel = {
   
   async findByCategory(categoryId: string): Promise<MenuItem[]> {
     const db = getDB()
+    const categoryFilter = ObjectId.isValid(categoryId) ? new ObjectId(categoryId) : categoryId
     const docs = await db.collection('menu_items')
-      .find({ categoryId })
+      .find({ categoryId: categoryFilter })
       .sort({ name: 1 })
       .toArray()
     return docs.map(doc => toMenuItem(doc)!).filter(i => i !== null)
@@ -133,10 +167,48 @@ export const MenuItemModel = {
   
   async update(id: string, updates: Partial<MenuItem>): Promise<void> {
     const db = getDB()
+    if (!ObjectId.isValid(id)) {
+      throw new Error('ID invalide')
+    }
+
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates
+    const updateData: Record<string, unknown> = { updatedAt: new Date() }
+    const unsetData: Record<string, ''> = {}
+
+    if (safeUpdates.name !== undefined) updateData.name = safeUpdates.name
+    if (safeUpdates.description !== undefined) updateData.description = safeUpdates.description
+    if (safeUpdates.price !== undefined) updateData.price = safeUpdates.price
+    if (safeUpdates.points !== undefined) updateData.points = safeUpdates.points
+    if (safeUpdates.image === null) {
+      unsetData.image = ''
+    } else if (safeUpdates.image !== undefined) {
+      updateData.image = safeUpdates.image
+    }
+    if (safeUpdates.allergens !== undefined) updateData.allergens = safeUpdates.allergens
+    if (safeUpdates.isAvailable !== undefined) updateData.isAvailable = safeUpdates.isAvailable
+    if (safeUpdates.tags !== undefined) updateData.tags = safeUpdates.tags
+    if (safeUpdates.promotion !== undefined) updateData.promotion = safeUpdates.promotion
+    if (safeUpdates.recipeId !== undefined) updateData.recipeId = safeUpdates.recipeId
+
+    if (safeUpdates.availableSupplements !== undefined) {
+      updateData.availableSupplements = Array.isArray(safeUpdates.availableSupplements)
+        ? safeUpdates.availableSupplements.map(normalizeSupplementId)
+        : safeUpdates.availableSupplements
+    }
+
+    if (safeUpdates.categoryId !== undefined && safeUpdates.categoryId !== null) {
+      updateData.categoryId =
+        typeof safeUpdates.categoryId === 'string' && ObjectId.isValid(safeUpdates.categoryId)
+          ? new ObjectId(safeUpdates.categoryId)
+          : safeUpdates.categoryId
+    }
+
     await db.collection('menu_items').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { ...safeUpdates, updatedAt: new Date() } }
+      {
+        $set: updateData,
+        ...(Object.keys(unsetData).length > 0 ? { $unset: unsetData } : {}),
+      }
     )
   },
   

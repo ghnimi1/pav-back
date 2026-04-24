@@ -48,25 +48,37 @@ function parseJsonField<T>(value: unknown, fallback: T): T {
   return value as T
 }
 
-function parseMenuItemPayload(req: Request) {
+function parseMenuItemPayload(req: Request): any {
   const body = req.body as Record<string, unknown>
   const imageFromUpload = getUploadedImagePath(req.file)
   const removeImage = parseBoolean(body.removeImage) === true
 
-  return {
-    name: typeof body.name === 'string' ? body.name : undefined,
-    description: typeof body.description === 'string' ? body.description : undefined,
-    price: parseNumber(body.price),
-    points: parseNumber(body.points),
-    categoryId: typeof body.categoryId === 'string' ? body.categoryId : undefined,
-    image: removeImage ? undefined : imageFromUpload || (typeof body.image === 'string' && body.image.trim() ? body.image : undefined),
-    allergens: parseJsonField<string[]>(body.allergens, []),
-    isAvailable: parseBoolean(body.isAvailable),
-    tags: parseJsonField<string[] | undefined>(body.tags, undefined),
-    supplements: parseJsonField(body.supplements, undefined),
-    promotion: parseJsonField(body.promotion, undefined),
-    recipeId: typeof body.recipeId === 'string' && body.recipeId.trim() ? body.recipeId : undefined,
+  const rawAvailableSupplements = body.availableSupplements ?? body.supplements
+  const result: any = {}
+
+  if (typeof body.name === 'string' && body.name.trim() !== '') result.name = body.name
+  if (typeof body.description === 'string') result.description = body.description
+  if (body.price !== undefined && body.price !== null && body.price !== '') result.price = parseNumber(body.price)
+  if (body.points !== undefined && body.points !== null && body.points !== '') result.points = parseNumber(body.points)
+  if (typeof body.categoryId === 'string' && body.categoryId.trim() !== '') result.categoryId = body.categoryId
+  if (body.allergens !== undefined) result.allergens = parseJsonField<string[]>(body.allergens, [])
+  if (body.isAvailable !== undefined && body.isAvailable !== null) result.isAvailable = parseBoolean(body.isAvailable)
+  if (body.tags !== undefined) result.tags = parseJsonField<string[] | undefined>(body.tags, undefined)
+  if (rawAvailableSupplements !== undefined) {
+    result.availableSupplements = parseJsonField(rawAvailableSupplements, undefined)
   }
+  if (body.promotion !== undefined) result.promotion = parseJsonField(body.promotion, undefined)
+  if (typeof body.recipeId === 'string' && body.recipeId.trim()) result.recipeId = body.recipeId
+
+  if (removeImage) {
+    result.image = null
+  } else if (imageFromUpload) {
+    result.image = imageFromUpload
+  } else if (typeof body.image === 'string' && body.image.trim()) {
+    result.image = body.image
+  }
+
+  return result
 }
 
 function parseBreakfastItemPayload(req: Request) {
@@ -282,9 +294,26 @@ export const MenuController = {
       }
 
       const payload = parseMenuItemPayload(req)
-      await menuItemService.updateItem(id, payload)
+      const mergedPayload = {
+        name: payload.name ?? currentItem.name,
+        description: payload.description ?? currentItem.description,
+        price: payload.price ?? currentItem.price,
+        points: payload.points ?? currentItem.points,
+        categoryId: payload.categoryId ?? currentItem.categoryId,
+        image: payload.image !== undefined ? payload.image : currentItem.image,
+        allergens: payload.allergens ?? currentItem.allergens,
+        isAvailable: payload.isAvailable ?? currentItem.isAvailable,
+        tags: payload.tags ?? currentItem.tags,
+        availableSupplements: payload.availableSupplements !== undefined
+          ? payload.availableSupplements
+          : currentItem.availableSupplements,
+        promotion: payload.promotion ?? currentItem.promotion,
+        recipeId: payload.recipeId ?? currentItem.recipeId,
+      }
 
-      if ((req.file || parseBoolean((req.body as Record<string, unknown>).removeImage) === true) && currentItem.image !== payload.image) {
+      await menuItemService.updateItem(id, mergedPayload)
+
+      if ((req.file || parseBoolean((req.body as Record<string, unknown>).removeImage) === true) && currentItem.image !== mergedPayload.image) {
         await removeLocalImageIfNeeded(currentItem.image)
       }
 
