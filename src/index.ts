@@ -17,14 +17,14 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middlewares
-// Middlewares - Version qui accepte TOUT
 app.use(cors({
-  origin: true,  // true = reflète l'origin de la requête
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/uploads', express.static(uploadsDir))
+
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/stock', stockRoutes)
