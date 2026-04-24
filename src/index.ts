@@ -17,33 +17,14 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middlewares
-// Configuration CORS plus flexible
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001', 
-  'https://pav-back.onrender.com',
-  /\.vercel\.app$/  // Accepte toutes les URLs *.vercel.app
-]
-
+// Middlewares - Version qui accepte TOUT
 app.use(cors({
-  origin: function(origin, callback) {
-    // Permettre les requêtes sans origin (comme les apps mobile ou Postman)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.some(allowed => 
-      typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-    )) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true,  // true = reflète l'origin de la requête
   credentials: true
 }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/uploads', express.static(uploadsDir))
-
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/stock', stockRoutes)
