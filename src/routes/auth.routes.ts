@@ -13,5 +13,9 @@ router.get('/me', authMiddleware, AuthController.me)
 router.put('/profile', authMiddleware, AuthController.updateProfile)
 router.post('/change-password', authMiddleware, AuthController.changePassword)
 router.get('/loyalty/stats', authMiddleware, AuthController.getLoyaltyStats)
+router.get('/employees', authMiddleware, AuthController.getEmployees)
+router.post('/employees', authMiddleware, AuthController.createEmployee)
+router.put('/employees/:id', authMiddleware, AuthController.updateEmployee)
+router.delete('/employees/:id', authMiddleware, AuthController.deleteEmployee)
 
 export default router

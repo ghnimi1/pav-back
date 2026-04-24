@@ -40,6 +40,9 @@ export interface CreateUserInput {
   role?: UserRole
   phone?: string
   referralCode?: string
+  employeeRole?: EmployeeRole
+  permissions?: string[]
+  isActive?: boolean
 }
 
 const TIER_THRESHOLDS = {
@@ -122,7 +125,9 @@ export const UserModel = {
       referralCount: 0,
       walletBalance: 0,
       qrCode: generateQRCode(),
-      isActive: true,
+      employeeRole: input.employeeRole,
+      permissions: input.permissions,
+      isActive: input.isActive ?? true,
       createdAt: now,
       updatedAt: now
     }
@@ -234,7 +239,7 @@ export const UserModel = {
   async findAllEmployees(): Promise<User[]> {
     const db = getDB()
     const docs = await db.collection('users')
-      .find({ role: 'admin', employeeRole: { $exists: true } })
+      .find({ employeeRole: { $exists: true } })
       .sort({ createdAt: -1 })
       .toArray()
     return toUsers(docs)
