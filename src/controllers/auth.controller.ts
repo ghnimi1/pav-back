@@ -101,6 +101,59 @@ export const AuthController = {
     }
   },
 
+  async awardLoyaltyPoints(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { userId, points, description, totalSpent, totalOrdersIncrement, lastVisit } = req.body
+      if (!userId || typeof points !== 'number' || !description) {
+        return res.status(400).json({ error: 'userId, points et description requis' })
+      }
+
+      const user = await authService.awardLoyaltyPoints(req.user.id, {
+        userId,
+        points,
+        description,
+        totalSpent,
+        totalOrdersIncrement,
+        lastVisit,
+      })
+
+      res.json({ user })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async updateLoyaltyClient(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { userId, totalSpent, totalOrders, lastVisit, walletBalance } = req.body
+      if (!userId) {
+        return res.status(400).json({ error: 'userId requis' })
+      }
+
+      const user = await authService.updateLoyaltyClient(req.user.id, {
+        userId,
+        totalSpent,
+        totalOrders,
+        lastVisit,
+        walletBalance,
+      })
+
+      res.json({ user })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
   async getEmployees(req: Request, res: Response) {
     try {
       if (!req.user) {

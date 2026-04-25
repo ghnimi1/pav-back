@@ -28,6 +28,23 @@ export interface EmployeeInput {
   isActive?: boolean
 }
 
+export interface LoyaltyPointsInput {
+  userId: string
+  points: number
+  description: string
+  totalSpent?: number
+  totalOrdersIncrement?: number
+  lastVisit?: string
+}
+
+export interface LoyaltyClientUpdateInput {
+  userId: string
+  totalSpent?: number
+  totalOrders?: number
+  lastVisit?: string
+  walletBalance?: number
+}
+
 export interface AuthResponse {
   token: string
   user: Omit<User, 'password'>
@@ -53,6 +70,20 @@ export class AuthService {
     }
 
     return actor
+  }
+
+  private async assertLoyaltyAccess(actorId: string, targetUserId: string): Promise<void> {
+    const actor = await UserModel.findById(actorId)
+    if (!actor) {
+      throw new Error('Utilisateur non trouve')
+    }
+
+    const isSelf = actor._id === targetUserId
+    const isAdmin = actor.role === 'admin'
+
+    if (!isSelf && !isAdmin) {
+      throw new Error('Acces refuse')
+    }
   }
 
   async login(input: LoginInput): Promise<AuthResponse> {
@@ -204,6 +235,58 @@ export class AuthService {
 
   async redeemLoyaltyPoints(userId: string, points: number, description: string): Promise<boolean> {
     return await UserModel.redeemPoints(userId, points, description)
+  }
+
+  async awardLoyaltyPoints(actorId: string, input: LoyaltyPointsInput): Promise<Omit<User, 'password'>> {
+    await this.assertLoyaltyAccess(actorId, input.userId)
+
+    await UserModel.addPoints(input.userId, input.points, input.description)
+
+    const currentUser = await UserModel.findById(input.userId)
+    if (!currentUser) {
+      throw new Error('Utilisateur non trouve')
+    }
+
+    const nextTotalSpent = input.totalSpent ?? currentUser.totalSpent
+    const nextTotalOrders = input.totalOrdersIncrement !== undefined
+      ? (currentUser.totalOrders || 0) + input.totalOrdersIncrement
+      : currentUser.totalOrders
+
+    await UserModel.update(input.userId, {
+      totalSpent: nextTotalSpent,
+      totalOrders: nextTotalOrders,
+      lastLogin: input.lastVisit ? new Date(input.lastVisit) : currentUser.lastLogin,
+    })
+
+    const updatedUser = await UserModel.findById(input.userId)
+    if (!updatedUser) {
+      throw new Error('Utilisateur non trouve')
+    }
+
+    return this.sanitizeUser(updatedUser)
+  }
+
+  async updateLoyaltyClient(actorId: string, input: LoyaltyClientUpdateInput): Promise<Omit<User, 'password'>> {
+    await this.assertLoyaltyAccess(actorId, input.userId)
+
+    const currentUser = await UserModel.findById(input.userId)
+    if (!currentUser) {
+      throw new Error('Utilisateur non trouve')
+    }
+
+    await UserModel.update(input.userId, {
+      totalSpent: input.totalSpent ?? currentUser.totalSpent,
+      totalOrders: input.totalOrders ?? currentUser.totalOrders,
+      walletBalance: input.walletBalance ?? currentUser.walletBalance,
+      lastLogin: input.lastVisit ? new Date(input.lastVisit) : currentUser.lastLogin,
+    })
+
+    const updatedUser = await UserModel.findById(input.userId)
+    if (!updatedUser) {
+      throw new Error('Utilisateur non trouve')
+    }
+
+    return this.sanitizeUser(updatedUser)
   }
 
   async getLoyaltyStats(userId: string) {
