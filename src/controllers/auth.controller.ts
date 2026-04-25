@@ -168,6 +168,20 @@ export const AuthController = {
     }
   },
 
+  async getClients(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const clients = await authService.getClients(req.user.id)
+      res.json({ clients })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(403).json({ error: message })
+    }
+  },
+
   async createEmployee(req: Request, res: Response) {
     try {
       if (!req.user) {

@@ -334,6 +334,12 @@ export class AuthService {
     return employees.map((employee) => this.sanitizeUser(employee))
   }
 
+  async getClients(actorId: string): Promise<Array<Omit<User, 'password'>>> {
+    await this.assertEmployeeManagementAccess(actorId)
+    const clients = await UserModel.findAllClients()
+    return clients.map((client) => this.sanitizeUser(client))
+  }
+
   async createEmployee(actorId: string, input: EmployeeInput): Promise<Omit<User, 'password'>> {
     await this.assertEmployeeManagementAccess(actorId)
 
