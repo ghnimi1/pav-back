@@ -7,6 +7,7 @@ import {
   type RemoteOrder,
   type OrderStatus,
 } from '../models/RemoteOrder.model'
+import { authService } from './auth.service'
 
 export class OrdersService {
   async getAllOrders(): Promise<RemoteOrder[]> {
@@ -44,13 +45,21 @@ export class OrdersService {
 
     const orderNumber = await RemoteOrderModel.getNextOrderNumber()
 
-    return RemoteOrderModel.create({
+    const order = await RemoteOrderModel.create({
       ...data,
       orderNumber,
       deliveryFee,
       estimatedTime,
       total: data.subtotal + deliveryFee,
     })
+
+    await authService.validateReferralFirstPurchaseForClient(
+      order.total,
+      order.clientId,
+      order.clientEmail
+    )
+
+    return order
   }
 
   async updateOrderStatus(id: string, status: OrderStatus, staffId?: string): Promise<void> {

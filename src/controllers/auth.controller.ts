@@ -182,6 +182,39 @@ export const AuthController = {
     }
   },
 
+  async getReferrals(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const referrals = await authService.getReferrals(req.user.id)
+      res.json({ referrals })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(403).json({ error: message })
+    }
+  },
+
+  async validateReferralFirstPurchase(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { purchaseAmount } = req.body
+      if (typeof purchaseAmount !== 'number' || purchaseAmount <= 0) {
+        return res.status(400).json({ error: 'purchaseAmount invalide' })
+      }
+
+      await authService.validateReferralFirstPurchase(req.params.id, purchaseAmount)
+      res.json({ success: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
   async createEmployee(req: Request, res: Response) {
     try {
       if (!req.user) {
