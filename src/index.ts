@@ -12,9 +12,24 @@ import ordersRoutes from './routes/orders.routes'
 
 const app = express()
 const uploadsDir = path.join(process.cwd(), 'uploads')
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'https://pav-front-2xbo.vercel.app',  // Si votre frontend est aussi sur Render
+  // Ajoutez d'autres URLs si nécessaire
+]
+
 const corsOptions = {
-  origin: '*',
-  credentials: false,  // ← Changement ici
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      console.log(`Blocked origin: ${origin}`)
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }
