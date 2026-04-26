@@ -14,7 +14,7 @@ const app = express()
 const uploadsDir = path.join(process.cwd(), 'uploads')
 const corsOptions = {
   origin: '*',
-  credentials: true,
+  credentials: false,  // ← Changement ici
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }
