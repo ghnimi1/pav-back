@@ -1,5 +1,4 @@
 import express from 'express'
-import cors from 'cors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { connectDB } from './config/database'
@@ -12,14 +11,28 @@ import ordersRoutes from './routes/orders.routes'
 
 const app = express()
 const uploadsDir = path.join(process.cwd(), 'uploads')
-const corsOptions = {
-  origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
-    // Allow all origins, including tools/server requests without an Origin header.
-    callback(null, true)
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+
+const allowedOrigins = new Set(
+  env.CORS_ORIGINS
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+)
+
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.has(origin)) {
+    return true
+  }
+
+  if (/^https:\/\/.*\.vercel\.app$/i.test(origin)) {
+    return true
+  }
+
+  if (/^http:\/\/localhost:\d+$/i.test(origin) || /^https:\/\/localhost:\d+$/i.test(origin)) {
+    return true
+  }
+
+  return false
 }
 
 if (!fs.existsSync(uploadsDir)) {
@@ -27,7 +40,27 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middlewares
-app.use(cors(corsOptions))
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+
+  if (origin && isAllowedOrigin(origin)) {
+    res.header('Access-Control-Allow-Origin', origin)
+    res.header('Vary', 'Origin')
+    res.header('Access-Control-Allow-Credentials', 'true')
+  }
+
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+  res.header(
+    'Access-Control-Allow-Headers',
+    req.headers['access-control-request-headers'] || 'Content-Type, Authorization'
+  )
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204)
+  }
+
+  next()
+})
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/uploads', express.static(uploadsDir))
