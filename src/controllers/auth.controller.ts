@@ -248,7 +248,7 @@ export const AuthController = {
         return res.status(400).json({ error: 'purchaseAmount invalide' })
       }
 
-      await authService.validateReferralFirstPurchase(req.params.id, purchaseAmount)
+      await authService.validateReferralFirstPurchase(req.params.id as any, purchaseAmount)
       res.json({ success: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur serveur'
@@ -291,7 +291,7 @@ export const AuthController = {
         return res.status(401).json({ error: 'Non authentifie' })
       }
 
-      const employee = await authService.updateEmployee(req.user.id, req.params.id, req.body)
+      const employee = await authService.updateEmployee(req.user.id, req.params.id as any, req.body)
       res.json({ employee })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur serveur'
@@ -305,7 +305,7 @@ export const AuthController = {
         return res.status(401).json({ error: 'Non authentifie' })
       }
 
-      await authService.deleteEmployee(req.user.id, req.params.id)
+      await authService.deleteEmployee(req.user.id, req.params.id as any)
       res.json({ success: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur serveur'
