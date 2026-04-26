@@ -13,10 +13,7 @@ import ordersRoutes from './routes/orders.routes'
 const app = express()
 const uploadsDir = path.join(process.cwd(), 'uploads')
 const corsOptions = {
-  origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
-    // Allow all origins, including tools/server requests without an Origin header.
-    callback(null, true)
-  },
+  origin: '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
