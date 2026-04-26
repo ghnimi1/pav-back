@@ -101,6 +101,47 @@ export const AuthController = {
     }
   },
 
+  async getReferralConfig(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const config = await authService.getReferralConfig()
+      res.json({ config })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async updateReferralConfig(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Acces refuse' })
+      }
+
+      const { referrerReward, referredReward } = req.body
+      if (
+        typeof referrerReward !== 'number' ||
+        referrerReward < 0 ||
+        typeof referredReward !== 'number' ||
+        referredReward < 0
+      ) {
+        return res.status(400).json({ error: 'Configuration de parrainage invalide' })
+      }
+
+      const config = await authService.updateReferralConfig({ referrerReward, referredReward })
+      res.json({ config })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
   async awardLoyaltyPoints(req: Request, res: Response) {
     try {
       if (!req.user) {

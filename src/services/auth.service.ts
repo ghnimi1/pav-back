@@ -45,6 +45,11 @@ export interface LoyaltyClientUpdateInput {
   walletBalance?: number
 }
 
+export interface ReferralConfig {
+  referrerReward: number
+  referredReward: number
+}
+
 export interface ReferralRecord {
   id: string
   referrerId: string
@@ -67,9 +72,51 @@ export interface AuthResponse {
 }
 
 export class AuthService {
+  private readonly defaultReferralConfig: ReferralConfig = {
+    referrerReward: 100,
+    referredReward: 50,
+  }
+
   private sanitizeUser(user: User): Omit<User, 'password'> {
     const { password, ...userWithoutPassword } = user
     return userWithoutPassword
+  }
+
+  private async getReferralConfigDocument() {
+    const db = getDB()
+    return db.collection('referral_config').findOne({})
+  }
+
+  async getReferralConfig(): Promise<ReferralConfig> {
+    const config = await this.getReferralConfigDocument()
+    return {
+      referrerReward: typeof config?.referrerReward === 'number' ? config.referrerReward : this.defaultReferralConfig.referrerReward,
+      referredReward: typeof config?.referredReward === 'number' ? config.referredReward : this.defaultReferralConfig.referredReward,
+    }
+  }
+
+  async updateReferralConfig(config: ReferralConfig): Promise<ReferralConfig> {
+    const db = getDB()
+    const existing = await this.getReferralConfigDocument()
+    const nextConfig = {
+      referrerReward: config.referrerReward,
+      referredReward: config.referredReward,
+      updatedAt: new Date(),
+    }
+
+    if (existing?._id) {
+      await db.collection('referral_config').updateOne(
+        { _id: existing._id },
+        { $set: nextConfig }
+      )
+    } else {
+      await db.collection('referral_config').insertOne(nextConfig)
+    }
+
+    return {
+      referrerReward: nextConfig.referrerReward,
+      referredReward: nextConfig.referredReward,
+    }
   }
 
   private async assertEmployeeManagementAccess(actorId: string): Promise<User> {
@@ -171,6 +218,7 @@ export class AuthService {
       return
     }
 
+    const referralConfig = await this.getReferralConfig()
     const db = getDB()
     await db.collection('referrals').insertOne({
       referrerId: referrer._id,
@@ -178,12 +226,12 @@ export class AuthService {
       referredName: newUser.name,
       referredEmail: newUser.email,
       status: 'first_purchase_pending',
-      referrerReward: 100,
-      referredReward: 50,
+      referrerReward: referralConfig.referrerReward,
+      referredReward: referralConfig.referredReward,
       createdAt: new Date(),
     })
 
-    await UserModel.addPoints(newUser._id!, 50, 'Points de bienvenue - Parrainage')
+    await UserModel.addPoints(newUser._id!, referralConfig.referredReward, 'Points de bienvenue - Parrainage')
     await UserModel.update(referrer._id!, {
       referralCount: (referrer.referralCount || 0) + 1,
     })
