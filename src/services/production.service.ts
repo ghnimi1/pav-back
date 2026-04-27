@@ -439,6 +439,10 @@ export class ProductionOrderService {
 // ============================================
 
 export class ShowcaseItemService {
+  async getAll(): Promise<ShowcaseItem[]> {
+    return ShowcaseItemModel.findAll()
+  }
+
   async getByShowcase(showcaseId: string): Promise<ShowcaseItem[]> {
     const db = getDB()
     const docs = await db.collection('showcase_items')

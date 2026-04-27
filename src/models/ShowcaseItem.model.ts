@@ -49,6 +49,15 @@ function toShowcaseItem(doc: WithId<Document> | null): ShowcaseItem | null {
 
 export const ShowcaseItemModel = {
   collection: 'showcase_items',
+
+  async findAll(): Promise<ShowcaseItem[]> {
+    const db = getDB()
+    const docs = await db.collection('showcase_items')
+      .find({})
+      .sort({ productionDate: 1 })
+      .toArray()
+    return docs.map(doc => toShowcaseItem(doc)!).filter(i => i !== null)
+  },
   
   async create(input: any): Promise<ShowcaseItem> {
     const db = getDB()

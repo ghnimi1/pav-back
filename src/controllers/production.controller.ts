@@ -449,7 +449,7 @@ export const ProductionController = {
       const showcaseId = getQueryString(req.query.showcaseId)
       const items = showcaseId
         ? await showcaseItemService.getByShowcase(showcaseId)
-        : await showcaseItemService.getAvailable()
+        : await showcaseItemService.getAll()
       res.json({ success: true, data: items })
     } catch (error) {
       console.error('Get showcase items error:', error)
