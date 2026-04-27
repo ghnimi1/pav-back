@@ -328,6 +328,16 @@ export const StockController = {
   // ============================================
   // BATCHES
   // ============================================
+
+  async getAllBatches(req: Request, res: Response) {
+    try {
+      const batches = await batchService.getAllBatches()
+      res.json({ success: true, data: batches })
+    } catch (error) {
+      console.error('Get all batches error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la récupération des lots' })
+    }
+  },
   
   async getBatchesByProduct(req: Request, res: Response) {
     try {

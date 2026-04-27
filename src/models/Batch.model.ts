@@ -62,6 +62,15 @@ function toBatches(docs: WithId<Document>[]): Batch[] {
 
 export const BatchModel = {
   collection: 'batches',
+
+  async findAll(): Promise<Batch[]> {
+    const db = getDB()
+    const docs = await db.collection('batches')
+      .find({})
+      .sort({ receptionDate: 1 })
+      .toArray()
+    return toBatches(docs)
+  },
   
   async create(input: CreateBatchInput): Promise<Batch> {
     const db = getDB()

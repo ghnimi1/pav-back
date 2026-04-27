@@ -332,6 +332,35 @@ export interface BatchWithProduct extends Batch {
 }
 
 export class BatchService {
+  async getAllBatches(): Promise<BatchWithProduct[]> {
+    const batches = await BatchModel.findAll()
+    const result: BatchWithProduct[] = []
+    const now = new Date()
+
+    for (const batch of batches) {
+      const product = await ProductModel.findById(batch.productId)
+      if (!product) continue
+
+      const expirationDate = batch.isOpened && batch.expirationAfterOpening
+        ? new Date(batch.expirationAfterOpening)
+        : new Date(batch.expirationDate)
+      const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      const isExpired = daysUntilExpiration < 0
+      const isExpiringSoon = daysUntilExpiration >= 0 && daysUntilExpiration <= 7
+
+      result.push({
+        ...batch,
+        productName: product.name,
+        daysUntilExpiration,
+        isExpired,
+        isExpiringSoon,
+        value: batch.quantity * batch.unitCost
+      })
+    }
+
+    return result
+  }
+
   async getBatchesByProduct(productId: string): Promise<BatchWithProduct[]> {
     const product = await ProductModel.findById(productId)
     if (!product) {

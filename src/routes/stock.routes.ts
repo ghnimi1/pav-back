@@ -17,23 +17,24 @@ router.delete('/categories/:id', adminOnly, StockController.deleteCategory)
 
 // ========== SUB-CATEGORIES ==========
 router.get('/subcategories', StockController.getAllSubCategories)
-router.get('/subcategories/:id', StockController.getSubCategoryById)
 router.get('/subcategories/category/:categoryId', StockController.getSubCategoriesByCategory)
+router.get('/subcategories/:id', StockController.getSubCategoryById)
 router.post('/subcategories', adminOnly, StockController.createSubCategory)
 router.put('/subcategories/:id', adminOnly, StockController.updateSubCategory)
 router.delete('/subcategories/:id', adminOnly, StockController.deleteSubCategory)
 
 // ========== PRODUCTS ==========
 router.get('/products', StockController.getAllProducts)
-router.get('/products/:id', StockController.getProductById)
+router.get('/products/low-stock', StockController.getLowStockProducts)
 router.get('/products/subcategory/:subCategoryId', StockController.getProductsBySubCategory)
+router.get('/products/:id/stock', StockController.getProductStock)
+router.get('/products/:id', StockController.getProductById)
 router.post('/products', adminOnly, StockController.createProduct)
 router.put('/products/:id', adminOnly, StockController.updateProduct)
 router.delete('/products/:id', adminOnly, StockController.deleteProduct)
-router.get('/products/:id/stock', StockController.getProductStock)
-router.get('/products/low-stock', StockController.getLowStockProducts)
 
 // ========== BATCHES ==========
+router.get('/batches', StockController.getAllBatches)
 router.get('/batches/product/:productId', StockController.getBatchesByProduct)
 router.get('/batches/product/:productId/active', StockController.getActiveBatches)
 router.post('/batches', adminOnly, StockController.createBatch)
