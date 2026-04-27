@@ -29,16 +29,26 @@ router.delete('/showcases/:id', adminOnly, ProductionController.deleteShowcase)
 
 // Production Orders
 router.get('/orders', ProductionController.getAllProductionOrders)
+router.get('/orders/today', ProductionController.getTodayProductionOrders)
 router.get('/orders/status/:status', ProductionController.getProductionOrdersByStatus)
+router.get('/orders/:id', ProductionController.getProductionOrderById)
 router.post('/orders', adminOnly, ProductionController.createProductionOrder)
+router.put('/orders/:id', adminOnly, ProductionController.updateProductionOrder)
 router.post('/orders/:id/start', adminOnly, ProductionController.startProduction)
 router.post('/orders/:id/complete', adminOnly, ProductionController.completeProduction)
 router.post('/orders/:id/cancel', adminOnly, ProductionController.cancelProduction)
 router.delete('/orders/:id', adminOnly, ProductionController.deleteProductionOrder)
 
 // Showcase Items
+router.get('/items', ProductionController.getShowcaseItems)
 router.get('/items/available', ProductionController.getAvailableItems)
+router.get('/items/expiring', ProductionController.getExpiringItems)
+router.get('/items/low', ProductionController.getLowStockItems)
+router.get('/items/available-recipes', ProductionController.getAvailableRecipes)
+router.get('/items/check-availability', ProductionController.checkAvailability)
+router.put('/items/:id', adminOnly, ProductionController.updateShowcaseItem)
 router.post('/items/:id/transfer', adminOnly, ProductionController.transferShowcaseItem)
+router.post('/items/decrement-stock', adminOnly, ProductionController.decrementStock)
 router.delete('/items/:id', adminOnly, ProductionController.deleteShowcaseItem)
 
 // Stats
