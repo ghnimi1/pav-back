@@ -6,6 +6,8 @@ import { ProductModel } from '../models/Product.model'
 import type { Product, UnitType } from '../models/Product.model'
 import { BatchModel } from '../models/Batch.model'
 import type { Batch } from '../models/Batch.model'
+import { RewardModel } from '../models/Reward.model'
+import type { Reward, RewardType } from '../models/Reward.model'
 import { getDB } from '../config/database'
 
 // ============================================
@@ -488,6 +490,88 @@ export class BatchService {
 }
 
 // ============================================
+// REWARDS SERVICE
+// ============================================
+
+export class RewardService {
+  async getAllRewards(activeOnly: boolean = false): Promise<Reward[]> {
+    return activeOnly ? RewardModel.findActive() : RewardModel.findAll()
+  }
+
+  async getRewardById(id: string): Promise<Reward | null> {
+    return RewardModel.findById(id)
+  }
+
+  async createReward(data: {
+    name: string
+    description: string
+    pointsCost: number
+    type: RewardType
+    value: string
+    image?: string
+    isActive?: boolean
+  }): Promise<Reward> {
+    if (!data.name?.trim()) {
+      throw new Error('Nom de la recompense requis')
+    }
+    if (!data.description?.trim()) {
+      throw new Error('Description de la recompense requise')
+    }
+    if (typeof data.pointsCost !== 'number' || data.pointsCost <= 0) {
+      throw new Error('Cout en points invalide')
+    }
+    if (!['discount', 'free_item', 'special'].includes(data.type)) {
+      throw new Error('Type de recompense invalide')
+    }
+    if (!data.value?.trim()) {
+      throw new Error('Valeur de la recompense requise')
+    }
+
+    return RewardModel.create({
+      name: data.name.trim(),
+      description: data.description.trim(),
+      pointsCost: data.pointsCost,
+      type: data.type,
+      value: data.value.trim(),
+      image: data.image?.trim() || undefined,
+      isActive: data.isActive,
+    })
+  }
+
+  async updateReward(id: string, data: Partial<Reward>): Promise<void> {
+    const reward = await RewardModel.findById(id)
+    if (!reward) {
+      throw new Error('Recompense non trouvee')
+    }
+
+    if (data.pointsCost !== undefined && (typeof data.pointsCost !== 'number' || data.pointsCost <= 0)) {
+      throw new Error('Cout en points invalide')
+    }
+
+    if (data.type !== undefined && !['discount', 'free_item', 'special'].includes(data.type)) {
+      throw new Error('Type de recompense invalide')
+    }
+
+    await RewardModel.update(id, {
+      ...data,
+      name: typeof data.name === 'string' ? data.name.trim() : data.name,
+      description: typeof data.description === 'string' ? data.description.trim() : data.description,
+      value: typeof data.value === 'string' ? data.value.trim() : data.value,
+      image: typeof data.image === 'string' ? data.image.trim() || undefined : data.image,
+    })
+  }
+
+  async deleteReward(id: string): Promise<void> {
+    const reward = await RewardModel.findById(id)
+    if (!reward) {
+      throw new Error('Recompense non trouvee')
+    }
+
+    await RewardModel.delete(id)
+  }
+}
+
+// ============================================
 // EXPORT SERVICES
 // ============================================
 
@@ -495,3 +579,4 @@ export const categoryService = new CategoryService()
 export const subCategoryService = new SubCategoryService()
 export const productService = new ProductService()
 export const batchService = new BatchService()
+export const rewardService = new RewardService()

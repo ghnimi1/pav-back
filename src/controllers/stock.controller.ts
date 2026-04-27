@@ -1,11 +1,68 @@
+import fs from 'node:fs/promises'
 import type { Request, Response } from 'express'
-import { categoryService, subCategoryService, productService, batchService } from '../services/stock.service'
+import { categoryService, subCategoryService, productService, batchService, rewardService } from '../services/stock.service'
+import { getLocalUploadAbsolutePath, getUploadedImagePath } from '../middleware/upload.middleware'
 
 // Helper function to get string from params
 function getParamString(param: string | string[] | undefined): string | undefined {
   if (!param) return undefined
   if (Array.isArray(param)) return param[0]
   return param
+}
+
+function parseBoolean(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    if (value === 'true') return true
+    if (value === 'false') return false
+  }
+  return undefined
+}
+
+function parseNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isNaN(value) ? undefined : value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    return Number.isNaN(parsed) ? undefined : parsed
+  }
+  return undefined
+}
+
+function parseRewardPayload(req: Request) {
+  const body = req.body as Record<string, unknown>
+  const imageFromUpload = getUploadedImagePath(req.file)
+  const removeImage = parseBoolean(body.removeImage) === true
+  const result: Record<string, unknown> = {}
+
+  if (typeof body.name === 'string' && body.name.trim() !== '') result.name = body.name
+  if (typeof body.description === 'string') result.description = body.description
+  if (body.pointsCost !== undefined && body.pointsCost !== null && body.pointsCost !== '') {
+    result.pointsCost = parseNumber(body.pointsCost)
+  }
+  if (typeof body.type === 'string' && body.type.trim() !== '') result.type = body.type
+  if (typeof body.value === 'string') result.value = body.value
+  if (body.isActive !== undefined && body.isActive !== null) result.isActive = parseBoolean(body.isActive)
+
+  if (removeImage) {
+    result.image = undefined
+  } else if (imageFromUpload) {
+    result.image = imageFromUpload
+  } else if (typeof body.image === 'string' && body.image.trim() !== '') {
+    result.image = body.image
+  }
+
+  return result
+}
+
+async function removeLocalImageIfNeeded(imagePath?: string) {
+  const absolutePath = getLocalUploadAbsolutePath(imagePath)
+  if (!absolutePath) return
+
+  try {
+    await fs.unlink(absolutePath)
+  } catch {
+    // Ignore missing files
+  }
 }
 
 export const StockController = {
@@ -413,6 +470,98 @@ export const StockController = {
     } catch (error) {
       console.error('Get total stock value error:', error)
       res.status(500).json({ success: false, error: 'Erreur lors de la récupération' })
+    }
+  },
+
+  // ============================================
+  // REWARDS
+  // ============================================
+
+  async getAllRewards(req: Request, res: Response) {
+    try {
+      const activeOnly = req.query.active === 'true'
+      const rewards = await rewardService.getAllRewards(activeOnly)
+      res.json({ success: true, data: rewards })
+    } catch (error) {
+      console.error('Get all rewards error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la recuperation des recompenses' })
+    }
+  },
+
+  async getRewardById(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+
+      const reward = await rewardService.getRewardById(id)
+      if (!reward) {
+        return res.status(404).json({ success: false, error: 'Recompense non trouvee' })
+      }
+
+      res.json({ success: true, data: reward })
+    } catch (error) {
+      console.error('Get reward by id error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la recuperation' })
+    }
+  },
+
+  async createReward(req: Request, res: Response) {
+    try {
+      const reward = await rewardService.createReward(parseRewardPayload(req) as any)
+      res.status(201).json({ success: true, data: reward, message: 'Recompense creee avec succes' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la creation'
+      res.status(400).json({ success: false, error: message })
+    }
+  },
+
+  async updateReward(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+
+      const currentReward = await rewardService.getRewardById(id)
+      if (!currentReward) {
+        return res.status(404).json({ success: false, error: 'Recompense non trouvee' })
+      }
+
+      const payload = parseRewardPayload(req)
+      await rewardService.updateReward(id, payload as any)
+
+      const nextImage = typeof payload.image === 'string' ? payload.image : undefined
+      if ((req.file || parseBoolean((req.body as Record<string, unknown>).removeImage) === true) && currentReward.image !== nextImage) {
+        await removeLocalImageIfNeeded(currentReward.image)
+      }
+
+      res.json({ success: true, message: 'Recompense mise a jour avec succes' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la mise a jour'
+      res.status(400).json({ success: false, error: message })
+    }
+  },
+
+  async deleteReward(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID requis' })
+      }
+
+      const currentReward = await rewardService.getRewardById(id)
+      if (!currentReward) {
+        return res.status(404).json({ success: false, error: 'Recompense non trouvee' })
+      }
+
+      await rewardService.deleteReward(id)
+      await removeLocalImageIfNeeded(currentReward.image)
+      res.json({ success: true, message: 'Recompense supprimee avec succes' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la suppression'
+      res.status(400).json({ success: false, error: message })
     }
   }
 }

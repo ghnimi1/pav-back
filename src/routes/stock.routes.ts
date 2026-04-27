@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authMiddleware, adminOnly } from '../middleware/auth.middleware'
 import { StockController } from '../controllers/stock.controller'
+import { uploadMenuImage } from '../middleware/upload.middleware'
 
 const router = Router()
 
@@ -45,5 +46,12 @@ router.post('/batches/consume', adminOnly, StockController.consumeStock)
 router.get('/alerts/expiring', StockController.getExpiringBatches)
 router.get('/stats', StockController.getStockStats)
 router.get('/stats/value', StockController.getTotalStockValue)
+
+// ========== REWARDS ==========
+router.get('/rewards', StockController.getAllRewards)
+router.get('/rewards/:id', StockController.getRewardById)
+router.post('/rewards', adminOnly, uploadMenuImage.single('imageFile'), StockController.createReward)
+router.put('/rewards/:id', adminOnly, uploadMenuImage.single('imageFile'), StockController.updateReward)
+router.delete('/rewards/:id', adminOnly, StockController.deleteReward)
 
 export default router

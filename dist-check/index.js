@@ -72575,7 +72575,7 @@ var require_multer = __commonJS((exports, module) => {
 var import_express6 = __toESM(require_express2(), 1);
 init_database();
 init_env();
-import fs3 from "fs";
+import fs4 from "fs";
 import path2 from "path";
 
 // src/routes/auth.routes.ts
@@ -74553,6 +74553,9 @@ var auth_routes_default = router;
 // src/routes/stock.routes.ts
 var import_express2 = __toESM(require_express2(), 1);
 
+// src/controllers/stock.controller.ts
+import fs2 from "fs/promises";
+
 // src/models/Category.model.ts
 init_database();
 var import_mongodb3 = __toESM(require_lib5(), 1);
@@ -74997,6 +75000,72 @@ var BatchModel = {
   }
 };
 
+// src/models/Reward.model.ts
+init_database();
+var import_mongodb7 = __toESM(require_lib5(), 1);
+function toReward(doc) {
+  if (!doc)
+    return null;
+  return {
+    _id: doc._id.toString(),
+    name: doc.name,
+    description: doc.description,
+    pointsCost: doc.pointsCost,
+    type: doc.type,
+    value: doc.value,
+    image: doc.image,
+    isActive: doc.isActive ?? true,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt
+  };
+}
+var RewardModel = {
+  collection: "rewards",
+  async create(input) {
+    const db2 = getDB();
+    const now = new Date;
+    const newReward = {
+      name: input.name,
+      description: input.description,
+      pointsCost: input.pointsCost,
+      type: input.type,
+      value: input.value,
+      image: input.image,
+      isActive: input.isActive !== false,
+      createdAt: now,
+      updatedAt: now
+    };
+    const result = await db2.collection("rewards").insertOne(newReward);
+    return { _id: result.insertedId.toString(), ...newReward };
+  },
+  async findAll() {
+    const db2 = getDB();
+    const docs = await db2.collection("rewards").find({}).sort({ createdAt: -1 }).toArray();
+    return docs.map((doc) => toReward(doc)).filter((reward) => reward !== null);
+  },
+  async findActive() {
+    const db2 = getDB();
+    const docs = await db2.collection("rewards").find({ isActive: true }).sort({ createdAt: -1 }).toArray();
+    return docs.map((doc) => toReward(doc)).filter((reward) => reward !== null);
+  },
+  async findById(id) {
+    const db2 = getDB();
+    if (!import_mongodb7.ObjectId.isValid(id))
+      return null;
+    const doc = await db2.collection("rewards").findOne({ _id: new import_mongodb7.ObjectId(id) });
+    return toReward(doc);
+  },
+  async update(id, updates) {
+    const db2 = getDB();
+    const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
+    await db2.collection("rewards").updateOne({ _id: new import_mongodb7.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+  },
+  async delete(id) {
+    const db2 = getDB();
+    await db2.collection("rewards").deleteOne({ _id: new import_mongodb7.ObjectId(id) });
+  }
+};
+
 // src/services/stock.service.ts
 init_database();
 
@@ -75324,10 +75393,118 @@ class BatchService {
     };
   }
 }
+
+class RewardService {
+  async getAllRewards(activeOnly = false) {
+    return activeOnly ? RewardModel.findActive() : RewardModel.findAll();
+  }
+  async getRewardById(id) {
+    return RewardModel.findById(id);
+  }
+  async createReward(data) {
+    if (!data.name?.trim()) {
+      throw new Error("Nom de la recompense requis");
+    }
+    if (!data.description?.trim()) {
+      throw new Error("Description de la recompense requise");
+    }
+    if (typeof data.pointsCost !== "number" || data.pointsCost <= 0) {
+      throw new Error("Cout en points invalide");
+    }
+    if (!["discount", "free_item", "special"].includes(data.type)) {
+      throw new Error("Type de recompense invalide");
+    }
+    if (!data.value?.trim()) {
+      throw new Error("Valeur de la recompense requise");
+    }
+    return RewardModel.create({
+      name: data.name.trim(),
+      description: data.description.trim(),
+      pointsCost: data.pointsCost,
+      type: data.type,
+      value: data.value.trim(),
+      image: data.image?.trim() || undefined,
+      isActive: data.isActive
+    });
+  }
+  async updateReward(id, data) {
+    const reward = await RewardModel.findById(id);
+    if (!reward) {
+      throw new Error("Recompense non trouvee");
+    }
+    if (data.pointsCost !== undefined && (typeof data.pointsCost !== "number" || data.pointsCost <= 0)) {
+      throw new Error("Cout en points invalide");
+    }
+    if (data.type !== undefined && !["discount", "free_item", "special"].includes(data.type)) {
+      throw new Error("Type de recompense invalide");
+    }
+    await RewardModel.update(id, {
+      ...data,
+      name: typeof data.name === "string" ? data.name.trim() : data.name,
+      description: typeof data.description === "string" ? data.description.trim() : data.description,
+      value: typeof data.value === "string" ? data.value.trim() : data.value,
+      image: typeof data.image === "string" ? data.image.trim() || undefined : data.image
+    });
+  }
+  async deleteReward(id) {
+    const reward = await RewardModel.findById(id);
+    if (!reward) {
+      throw new Error("Recompense non trouvee");
+    }
+    await RewardModel.delete(id);
+  }
+}
 var categoryService = new CategoryService;
 var subCategoryService = new SubCategoryService;
 var productService = new ProductService;
 var batchService = new BatchService;
+var rewardService = new RewardService;
+
+// src/middleware/upload.middleware.ts
+var import_multer = __toESM(require_multer(), 1);
+import fs from "fs";
+import path from "path";
+var uploadsDir = path.join(process.cwd(), "uploads", "menu");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+var storage = import_multer.default.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+    const base = path.basename(file.originalname || "image", ext).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    cb(null, `${Date.now()}-${base || "image"}${ext}`);
+  }
+});
+function fileFilter(_req, file, cb) {
+  if (!file.mimetype.startsWith("image/")) {
+    cb(new Error("Seuls les fichiers image sont autorises"));
+    return;
+  }
+  cb(null, true);
+}
+var uploadMenuImage = import_multer.default({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  }
+});
+function getUploadedImagePath(file) {
+  if (!file)
+    return;
+  return `${file.filename}`;
+}
+function getLocalUploadAbsolutePath(imagePath) {
+  if (!imagePath)
+    return null;
+  if (imagePath.startsWith("/uploads/")) {
+    return path.join(process.cwd(), imagePath.replace(/^\//, "").replace(/\//g, path.sep));
+  }
+  return path.join(uploadsDir, imagePath);
+}
 
 // src/controllers/stock.controller.ts
 function getParamString(param) {
@@ -75336,6 +75513,61 @@ function getParamString(param) {
   if (Array.isArray(param))
     return param[0];
   return param;
+}
+function parseBoolean(value) {
+  if (typeof value === "boolean")
+    return value;
+  if (typeof value === "string") {
+    if (value === "true")
+      return true;
+    if (value === "false")
+      return false;
+  }
+  return;
+}
+function parseNumber(value) {
+  if (typeof value === "number")
+    return Number.isNaN(value) ? undefined : value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+  return;
+}
+function parseRewardPayload(req) {
+  const body = req.body;
+  const imageFromUpload = getUploadedImagePath(req.file);
+  const removeImage = parseBoolean(body.removeImage) === true;
+  const result = {};
+  if (typeof body.name === "string" && body.name.trim() !== "")
+    result.name = body.name;
+  if (typeof body.description === "string")
+    result.description = body.description;
+  if (body.pointsCost !== undefined && body.pointsCost !== null && body.pointsCost !== "") {
+    result.pointsCost = parseNumber(body.pointsCost);
+  }
+  if (typeof body.type === "string" && body.type.trim() !== "")
+    result.type = body.type;
+  if (typeof body.value === "string")
+    result.value = body.value;
+  if (body.isActive !== undefined && body.isActive !== null)
+    result.isActive = parseBoolean(body.isActive);
+  if (removeImage) {
+    result.image = undefined;
+  } else if (imageFromUpload) {
+    result.image = imageFromUpload;
+  } else if (typeof body.image === "string" && body.image.trim() !== "") {
+    result.image = body.image;
+  }
+  return result;
+}
+async function removeLocalImageIfNeeded(imagePath) {
+  const absolutePath = getLocalUploadAbsolutePath(imagePath);
+  if (!absolutePath)
+    return;
+  try {
+    await fs2.unlink(absolutePath);
+  } catch {}
 }
 var StockController = {
   async getAllCategories(req, res) {
@@ -75691,6 +75923,81 @@ var StockController = {
       console.error("Get total stock value error:", error);
       res.status(500).json({ success: false, error: "Erreur lors de la r\xE9cup\xE9ration" });
     }
+  },
+  async getAllRewards(req, res) {
+    try {
+      const activeOnly = req.query.active === "true";
+      const rewards = await rewardService.getAllRewards(activeOnly);
+      res.json({ success: true, data: rewards });
+    } catch (error) {
+      console.error("Get all rewards error:", error);
+      res.status(500).json({ success: false, error: "Erreur lors de la recuperation des recompenses" });
+    }
+  },
+  async getRewardById(req, res) {
+    try {
+      const id = getParamString(req.params.id);
+      if (!id) {
+        return res.status(400).json({ success: false, error: "ID requis" });
+      }
+      const reward = await rewardService.getRewardById(id);
+      if (!reward) {
+        return res.status(404).json({ success: false, error: "Recompense non trouvee" });
+      }
+      res.json({ success: true, data: reward });
+    } catch (error) {
+      console.error("Get reward by id error:", error);
+      res.status(500).json({ success: false, error: "Erreur lors de la recuperation" });
+    }
+  },
+  async createReward(req, res) {
+    try {
+      const reward = await rewardService.createReward(parseRewardPayload(req));
+      res.status(201).json({ success: true, data: reward, message: "Recompense creee avec succes" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur lors de la creation";
+      res.status(400).json({ success: false, error: message });
+    }
+  },
+  async updateReward(req, res) {
+    try {
+      const id = getParamString(req.params.id);
+      if (!id) {
+        return res.status(400).json({ success: false, error: "ID requis" });
+      }
+      const currentReward = await rewardService.getRewardById(id);
+      if (!currentReward) {
+        return res.status(404).json({ success: false, error: "Recompense non trouvee" });
+      }
+      const payload = parseRewardPayload(req);
+      await rewardService.updateReward(id, payload);
+      const nextImage = typeof payload.image === "string" ? payload.image : undefined;
+      if ((req.file || parseBoolean(req.body.removeImage) === true) && currentReward.image !== nextImage) {
+        await removeLocalImageIfNeeded(currentReward.image);
+      }
+      res.json({ success: true, message: "Recompense mise a jour avec succes" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur lors de la mise a jour";
+      res.status(400).json({ success: false, error: message });
+    }
+  },
+  async deleteReward(req, res) {
+    try {
+      const id = getParamString(req.params.id);
+      if (!id) {
+        return res.status(400).json({ success: false, error: "ID requis" });
+      }
+      const currentReward = await rewardService.getRewardById(id);
+      if (!currentReward) {
+        return res.status(404).json({ success: false, error: "Recompense non trouvee" });
+      }
+      await rewardService.deleteReward(id);
+      await removeLocalImageIfNeeded(currentReward.image);
+      res.json({ success: true, message: "Recompense supprimee avec succes" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur lors de la suppression";
+      res.status(400).json({ success: false, error: message });
+    }
   }
 };
 
@@ -75726,6 +76033,11 @@ router2.post("/batches/consume", adminOnly, StockController.consumeStock);
 router2.get("/alerts/expiring", StockController.getExpiringBatches);
 router2.get("/stats", StockController.getStockStats);
 router2.get("/stats/value", StockController.getTotalStockValue);
+router2.get("/rewards", StockController.getAllRewards);
+router2.get("/rewards/:id", StockController.getRewardById);
+router2.post("/rewards", adminOnly, uploadMenuImage.single("imageFile"), StockController.createReward);
+router2.put("/rewards/:id", adminOnly, uploadMenuImage.single("imageFile"), StockController.updateReward);
+router2.delete("/rewards/:id", adminOnly, StockController.deleteReward);
 var stock_routes_default = router2;
 
 // src/routes/production.routes.ts
@@ -75733,7 +76045,7 @@ var import_express3 = __toESM(require_express2(), 1);
 
 // src/models/Recipe.model.ts
 init_database();
-var import_mongodb7 = __toESM(require_lib5(), 1);
+var import_mongodb8 = __toESM(require_lib5(), 1);
 function toRecipe(doc) {
   if (!doc)
     return null;
@@ -75798,19 +76110,19 @@ var RecipeModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb7.ObjectId.isValid(id))
+    if (!import_mongodb8.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("recipes").findOne({ _id: new import_mongodb7.ObjectId(id) });
+    const doc = await db2.collection("recipes").findOne({ _id: new import_mongodb8.ObjectId(id) });
     return toRecipe(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection("recipes").updateOne({ _id: new import_mongodb7.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection("recipes").updateOne({ _id: new import_mongodb8.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("recipes").deleteOne({ _id: new import_mongodb7.ObjectId(id) });
+    await db2.collection("recipes").deleteOne({ _id: new import_mongodb8.ObjectId(id) });
   },
   async getRecipeCost(recipeId) {
     const recipe = await this.findById(recipeId);
@@ -75819,7 +76131,7 @@ var RecipeModel = {
     const db2 = getDB();
     let totalCost = 0;
     for (const ing of recipe.ingredients) {
-      const product = await db2.collection("products").findOne({ _id: new import_mongodb7.ObjectId(ing.productId) });
+      const product = await db2.collection("products").findOne({ _id: new import_mongodb8.ObjectId(ing.productId) });
       if (product) {
         totalCost += (product.unitPrice || 0) * ing.quantity;
       }
@@ -75830,7 +76142,7 @@ var RecipeModel = {
 
 // src/models/RecipeCategory.model.ts
 init_database();
-var import_mongodb8 = __toESM(require_lib5(), 1);
+var import_mongodb9 = __toESM(require_lib5(), 1);
 function toRecipeCategory(doc) {
   if (!doc)
     return null;
@@ -75872,25 +76184,25 @@ var RecipeCategoryModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb8.ObjectId.isValid(id))
+    if (!import_mongodb9.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("recipe_categories").findOne({ _id: new import_mongodb8.ObjectId(id) });
+    const doc = await db2.collection("recipe_categories").findOne({ _id: new import_mongodb9.ObjectId(id) });
     return toRecipeCategory(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection("recipe_categories").updateOne({ _id: new import_mongodb8.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection("recipe_categories").updateOne({ _id: new import_mongodb9.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("recipe_categories").deleteOne({ _id: new import_mongodb8.ObjectId(id) });
+    await db2.collection("recipe_categories").deleteOne({ _id: new import_mongodb9.ObjectId(id) });
   }
 };
 
 // src/models/Showcase.model.ts
 init_database();
-var import_mongodb9 = __toESM(require_lib5(), 1);
+var import_mongodb10 = __toESM(require_lib5(), 1);
 function toShowcase(doc) {
   if (!doc)
     return null;
@@ -75936,25 +76248,25 @@ var ShowcaseModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb9.ObjectId.isValid(id))
+    if (!import_mongodb10.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("showcases").findOne({ _id: new import_mongodb9.ObjectId(id) });
+    const doc = await db2.collection("showcases").findOne({ _id: new import_mongodb10.ObjectId(id) });
     return toShowcase(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection("showcases").updateOne({ _id: new import_mongodb9.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection("showcases").updateOne({ _id: new import_mongodb10.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("showcases").deleteOne({ _id: new import_mongodb9.ObjectId(id) });
+    await db2.collection("showcases").deleteOne({ _id: new import_mongodb10.ObjectId(id) });
   }
 };
 
 // src/models/ProductionOrder.model.ts
 init_database();
-var import_mongodb10 = __toESM(require_lib5(), 1);
+var import_mongodb11 = __toESM(require_lib5(), 1);
 function toProductionOrder(doc) {
   if (!doc)
     return null;
@@ -76010,19 +76322,19 @@ var ProductionOrderModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb10.ObjectId.isValid(id))
+    if (!import_mongodb11.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("production_orders").findOne({ _id: new import_mongodb10.ObjectId(id) });
+    const doc = await db2.collection("production_orders").findOne({ _id: new import_mongodb11.ObjectId(id) });
     return toProductionOrder(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection("production_orders").updateOne({ _id: new import_mongodb10.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection("production_orders").updateOne({ _id: new import_mongodb11.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("production_orders").deleteOne({ _id: new import_mongodb10.ObjectId(id) });
+    await db2.collection("production_orders").deleteOne({ _id: new import_mongodb11.ObjectId(id) });
   },
   async startProduction(id, employeeId) {
     await this.update(id, {
@@ -76044,7 +76356,7 @@ var ProductionOrderModel = {
 
 // src/models/ShowcaseItem.model.ts
 init_database();
-var import_mongodb11 = __toESM(require_lib5(), 1);
+var import_mongodb12 = __toESM(require_lib5(), 1);
 function toShowcaseItem(doc) {
   if (!doc)
     return null;
@@ -76123,15 +76435,15 @@ var ShowcaseItemModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb11.ObjectId.isValid(id))
+    if (!import_mongodb12.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("showcase_items").findOne({ _id: new import_mongodb11.ObjectId(id) });
+    const doc = await db2.collection("showcase_items").findOne({ _id: new import_mongodb12.ObjectId(id) });
     return toShowcaseItem(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection("showcase_items").updateOne({ _id: new import_mongodb11.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection("showcase_items").updateOne({ _id: new import_mongodb12.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async decrementStock(id, quantity) {
     const item = await this.findById(id);
@@ -76147,13 +76459,13 @@ var ShowcaseItemModel = {
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("showcase_items").deleteOne({ _id: new import_mongodb11.ObjectId(id) });
+    await db2.collection("showcase_items").deleteOne({ _id: new import_mongodb12.ObjectId(id) });
   }
 };
 
 // src/services/production.service.ts
 init_database();
-var import_mongodb12 = __toESM(require_lib5(), 1);
+var import_mongodb13 = __toESM(require_lib5(), 1);
 function toProductionOrder2(doc) {
   if (!doc)
     return null;
@@ -76261,7 +76573,7 @@ class RecipeService {
       throw new Error("Cat\xE9gorie non trouv\xE9e");
     const db2 = getDB();
     for (const ing of data.ingredients) {
-      const product = await db2.collection("products").findOne({ _id: new import_mongodb12.ObjectId(ing.productId) });
+      const product = await db2.collection("products").findOne({ _id: new import_mongodb13.ObjectId(ing.productId) });
       if (!product)
         throw new Error(`Produit ${ing.productId} non trouv\xE9`);
     }
@@ -76299,7 +76611,7 @@ class RecipeService {
       const batches = await db2.collection("batches").find({ productId: ing.productId, quantity: { $gt: 0 } }).toArray();
       const available = batches.reduce((sum, b) => sum + b.quantity, 0);
       if (available < needed) {
-        const product = await db2.collection("products").findOne({ _id: new import_mongodb12.ObjectId(ing.productId) });
+        const product = await db2.collection("products").findOne({ _id: new import_mongodb13.ObjectId(ing.productId) });
         missing.push({
           productId: ing.productId,
           productName: product?.name || "Produit inconnu",
@@ -76390,9 +76702,9 @@ class ProductionOrderService {
   }
   async getById(id) {
     const db2 = getDB();
-    if (!import_mongodb12.ObjectId.isValid(id))
+    if (!import_mongodb13.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("production_orders").findOne({ _id: new import_mongodb12.ObjectId(id) });
+    const doc = await db2.collection("production_orders").findOne({ _id: new import_mongodb13.ObjectId(id) });
     return toProductionOrder2(doc);
   }
   async create(data) {
@@ -77224,11 +77536,11 @@ var production_routes_default = router3;
 var import_express4 = __toESM(require_express2(), 1);
 
 // src/controllers/menu.controller.ts
-import fs2 from "fs/promises";
+import fs3 from "fs/promises";
 
 // src/models/MenuCategory.model.ts
 init_database();
-var import_mongodb13 = __toESM(require_lib5(), 1);
+var import_mongodb14 = __toESM(require_lib5(), 1);
 function generateSlug3(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -77278,9 +77590,9 @@ var MenuCategoryModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb13.ObjectId.isValid(id))
+    if (!import_mongodb14.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("menu_categories").findOne({ _id: new import_mongodb13.ObjectId(id) });
+    const doc = await db2.collection("menu_categories").findOne({ _id: new import_mongodb14.ObjectId(id) });
     return toMenuCategory(doc);
   },
   async findBySlug(slug) {
@@ -77291,21 +77603,21 @@ var MenuCategoryModel = {
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection("menu_categories").updateOne({ _id: new import_mongodb13.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection("menu_categories").updateOne({ _id: new import_mongodb14.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("menu_categories").deleteOne({ _id: new import_mongodb13.ObjectId(id) });
+    await db2.collection("menu_categories").deleteOne({ _id: new import_mongodb14.ObjectId(id) });
   }
 };
 
 // src/models/MenuItem.model.ts
 init_database();
-var import_mongodb14 = __toESM(require_lib5(), 1);
+var import_mongodb15 = __toESM(require_lib5(), 1);
 function normalizeSupplementId(supp) {
   return {
     ...supp,
-    supplementId: typeof supp.supplementId === "string" && import_mongodb14.ObjectId.isValid(supp.supplementId) ? new import_mongodb14.ObjectId(supp.supplementId) : supp.supplementId
+    supplementId: typeof supp.supplementId === "string" && import_mongodb15.ObjectId.isValid(supp.supplementId) ? new import_mongodb15.ObjectId(supp.supplementId) : supp.supplementId
   };
 }
 function toMenuItem(doc) {
@@ -77315,7 +77627,7 @@ function toMenuItem(doc) {
   if (Array.isArray(availableSupplements)) {
     availableSupplements = availableSupplements.map((supp) => ({
       ...supp,
-      supplementId: supp.supplementId instanceof import_mongodb14.ObjectId ? supp.supplementId.toString() : supp.supplementId
+      supplementId: supp.supplementId instanceof import_mongodb15.ObjectId ? supp.supplementId.toString() : supp.supplementId
     }));
   }
   return {
@@ -77324,7 +77636,7 @@ function toMenuItem(doc) {
     description: doc.description,
     price: doc.price,
     points: doc.points,
-    categoryId: doc.categoryId instanceof import_mongodb14.ObjectId ? doc.categoryId.toString() : doc.categoryId,
+    categoryId: doc.categoryId instanceof import_mongodb15.ObjectId ? doc.categoryId.toString() : doc.categoryId,
     image: doc.image,
     allergens: doc.allergens || [],
     isAvailable: doc.isAvailable ?? true,
@@ -77341,7 +77653,7 @@ var MenuItemModel = {
   async create(input) {
     const db2 = getDB();
     const now = new Date;
-    const categoryIdObj = typeof input.categoryId === "string" && import_mongodb14.ObjectId.isValid(input.categoryId) ? new import_mongodb14.ObjectId(input.categoryId) : input.categoryId;
+    const categoryIdObj = typeof input.categoryId === "string" && import_mongodb15.ObjectId.isValid(input.categoryId) ? new import_mongodb15.ObjectId(input.categoryId) : input.categoryId;
     const availableSupplements = Array.isArray(input.availableSupplements) ? input.availableSupplements.map(normalizeSupplementId) : undefined;
     const newItem = {
       name: input.name,
@@ -77379,20 +77691,20 @@ var MenuItemModel = {
   },
   async findByCategory(categoryId) {
     const db2 = getDB();
-    const categoryFilter = import_mongodb14.ObjectId.isValid(categoryId) ? new import_mongodb14.ObjectId(categoryId) : categoryId;
+    const categoryFilter = import_mongodb15.ObjectId.isValid(categoryId) ? new import_mongodb15.ObjectId(categoryId) : categoryId;
     const docs = await db2.collection("menu_items").find({ categoryId: categoryFilter }).sort({ name: 1 }).toArray();
     return docs.map((doc) => toMenuItem(doc)).filter((i) => i !== null);
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb14.ObjectId.isValid(id))
+    if (!import_mongodb15.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("menu_items").findOne({ _id: new import_mongodb14.ObjectId(id) });
+    const doc = await db2.collection("menu_items").findOne({ _id: new import_mongodb15.ObjectId(id) });
     return toMenuItem(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
-    if (!import_mongodb14.ObjectId.isValid(id)) {
+    if (!import_mongodb15.ObjectId.isValid(id)) {
       throw new Error("ID invalide");
     }
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
@@ -77425,16 +77737,16 @@ var MenuItemModel = {
       updateData.availableSupplements = Array.isArray(safeUpdates.availableSupplements) ? safeUpdates.availableSupplements.map(normalizeSupplementId) : safeUpdates.availableSupplements;
     }
     if (safeUpdates.categoryId !== undefined && safeUpdates.categoryId !== null) {
-      updateData.categoryId = typeof safeUpdates.categoryId === "string" && import_mongodb14.ObjectId.isValid(safeUpdates.categoryId) ? new import_mongodb14.ObjectId(safeUpdates.categoryId) : safeUpdates.categoryId;
+      updateData.categoryId = typeof safeUpdates.categoryId === "string" && import_mongodb15.ObjectId.isValid(safeUpdates.categoryId) ? new import_mongodb15.ObjectId(safeUpdates.categoryId) : safeUpdates.categoryId;
     }
-    await db2.collection("menu_items").updateOne({ _id: new import_mongodb14.ObjectId(id) }, {
+    await db2.collection("menu_items").updateOne({ _id: new import_mongodb15.ObjectId(id) }, {
       $set: updateData,
       ...Object.keys(unsetData).length > 0 ? { $unset: unsetData } : {}
     });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("menu_items").deleteOne({ _id: new import_mongodb14.ObjectId(id) });
+    await db2.collection("menu_items").deleteOne({ _id: new import_mongodb15.ObjectId(id) });
   },
   async toggleAvailability(id) {
     const item = await this.findById(id);
@@ -77446,13 +77758,13 @@ var MenuItemModel = {
 
 // src/models/Supplement.model.ts
 init_database();
-var import_mongodb15 = __toESM(require_lib5(), 1);
+var import_mongodb16 = __toESM(require_lib5(), 1);
 function toSupplement(doc) {
   if (!doc)
     return null;
   let categoryId = undefined;
   if (doc.category) {
-    if (doc.category instanceof import_mongodb15.ObjectId) {
+    if (doc.category instanceof import_mongodb16.ObjectId) {
       categoryId = doc.category.toString();
     } else if (typeof doc.category === "string") {
       categoryId = doc.category;
@@ -77478,8 +77790,8 @@ var SupplementModel = {
     const now = new Date;
     let categoryValue = undefined;
     if (input.category) {
-      if (import_mongodb15.ObjectId.isValid(input.category)) {
-        categoryValue = new import_mongodb15.ObjectId(input.category);
+      if (import_mongodb16.ObjectId.isValid(input.category)) {
+        categoryValue = new import_mongodb16.ObjectId(input.category);
       } else {
         categoryValue = input.category;
       }
@@ -77514,9 +77826,9 @@ var SupplementModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb15.ObjectId.isValid(id))
+    if (!import_mongodb16.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("supplements").findOne({ _id: new import_mongodb15.ObjectId(id) });
+    const doc = await db2.collection("supplements").findOne({ _id: new import_mongodb16.ObjectId(id) });
     return toSupplement(doc);
   },
   async update(id, updates) {
@@ -77524,23 +77836,23 @@ var SupplementModel = {
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
     const updateData = { ...safeUpdates, updatedAt: new Date };
     if (updates.category) {
-      if (import_mongodb15.ObjectId.isValid(updates.category)) {
-        updateData.category = new import_mongodb15.ObjectId(updates.category);
+      if (import_mongodb16.ObjectId.isValid(updates.category)) {
+        updateData.category = new import_mongodb16.ObjectId(updates.category);
       } else {
         updateData.category = updates.category;
       }
     }
-    await db2.collection("supplements").updateOne({ _id: new import_mongodb15.ObjectId(id) }, { $set: updateData });
+    await db2.collection("supplements").updateOne({ _id: new import_mongodb16.ObjectId(id) }, { $set: updateData });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("supplements").deleteOne({ _id: new import_mongodb15.ObjectId(id) });
+    await db2.collection("supplements").deleteOne({ _id: new import_mongodb16.ObjectId(id) });
   }
 };
 
 // src/models/Offer.model.ts
 init_database();
-var import_mongodb16 = __toESM(require_lib5(), 1);
+var import_mongodb17 = __toESM(require_lib5(), 1);
 function toOffer(doc) {
   if (!doc)
     return null;
@@ -77623,25 +77935,25 @@ var OfferModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb16.ObjectId.isValid(id))
+    if (!import_mongodb17.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection("offers").findOne({ _id: new import_mongodb16.ObjectId(id) });
+    const doc = await db2.collection("offers").findOne({ _id: new import_mongodb17.ObjectId(id) });
     return toOffer(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection("offers").updateOne({ _id: new import_mongodb16.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection("offers").updateOne({ _id: new import_mongodb17.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection("offers").deleteOne({ _id: new import_mongodb16.ObjectId(id) });
+    await db2.collection("offers").deleteOne({ _id: new import_mongodb17.ObjectId(id) });
   }
 };
 
 // src/models/BreakfastCategory.model.ts
 init_database();
-var import_mongodb17 = __toESM(require_lib5(), 1);
+var import_mongodb18 = __toESM(require_lib5(), 1);
 function toBreakfastCategory(doc) {
   if (!doc)
     return null;
@@ -77687,25 +77999,25 @@ var BreakfastCategoryModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb17.ObjectId.isValid(id))
+    if (!import_mongodb18.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb17.ObjectId(id) });
+    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb18.ObjectId(id) });
     return toBreakfastCategory(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection(this.collection).updateOne({ _id: new import_mongodb17.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection(this.collection).updateOne({ _id: new import_mongodb18.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb17.ObjectId(id) });
+    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb18.ObjectId(id) });
   }
 };
 
 // src/models/BreakfastItem.model.ts
 init_database();
-var import_mongodb18 = __toESM(require_lib5(), 1);
+var import_mongodb19 = __toESM(require_lib5(), 1);
 function toBreakfastItem(doc) {
   if (!doc)
     return null;
@@ -77713,7 +78025,7 @@ function toBreakfastItem(doc) {
   if (Array.isArray(availableSupplements)) {
     availableSupplements = availableSupplements.map((supp) => ({
       ...supp,
-      supplementId: supp.supplementId instanceof import_mongodb18.ObjectId ? supp.supplementId.toString() : supp.supplementId
+      supplementId: supp.supplementId instanceof import_mongodb19.ObjectId ? supp.supplementId.toString() : supp.supplementId
     }));
   }
   return {
@@ -77722,7 +78034,7 @@ function toBreakfastItem(doc) {
     description: doc.description,
     price: doc.price,
     points: doc.points,
-    categoryId: doc.categoryId instanceof import_mongodb18.ObjectId ? doc.categoryId.toString() : doc.categoryId,
+    categoryId: doc.categoryId instanceof import_mongodb19.ObjectId ? doc.categoryId.toString() : doc.categoryId,
     image: doc.image,
     isAvailable: doc.isAvailable ?? true,
     isRequired: doc.isRequired,
@@ -77738,12 +78050,12 @@ var BreakfastItemModel = {
   async create(input) {
     const db2 = getDB();
     const now = new Date;
-    const categoryIdObj = typeof input.categoryId === "string" ? new import_mongodb18.ObjectId(input.categoryId) : input.categoryId;
+    const categoryIdObj = typeof input.categoryId === "string" ? new import_mongodb19.ObjectId(input.categoryId) : input.categoryId;
     let availableSupplements = undefined;
     if (input.availableSupplements && Array.isArray(input.availableSupplements)) {
       availableSupplements = input.availableSupplements.map((supp) => ({
         ...supp,
-        supplementId: typeof supp.supplementId === "string" && import_mongodb18.ObjectId.isValid(supp.supplementId) ? new import_mongodb18.ObjectId(supp.supplementId) : supp.supplementId
+        supplementId: typeof supp.supplementId === "string" && import_mongodb19.ObjectId.isValid(supp.supplementId) ? new import_mongodb19.ObjectId(supp.supplementId) : supp.supplementId
       }));
     }
     const newItem = {
@@ -77781,20 +78093,20 @@ var BreakfastItemModel = {
   },
   async findByCategory(categoryId) {
     const db2 = getDB();
-    const categoryIdObj = new import_mongodb18.ObjectId(categoryId);
+    const categoryIdObj = new import_mongodb19.ObjectId(categoryId);
     const docs = await db2.collection(this.collection).find({ categoryId: categoryIdObj }).sort({ name: 1 }).toArray();
     return docs.map((doc) => toBreakfastItem(doc)).filter(Boolean);
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb18.ObjectId.isValid(id))
+    if (!import_mongodb19.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb18.ObjectId(id) });
+    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb19.ObjectId(id) });
     return toBreakfastItem(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
-    if (!import_mongodb18.ObjectId.isValid(id)) {
+    if (!import_mongodb19.ObjectId.isValid(id)) {
       throw new Error("ID invalide");
     }
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
@@ -77821,26 +78133,26 @@ var BreakfastItemModel = {
       if (Array.isArray(safeUpdates.availableSupplements)) {
         updateData.availableSupplements = safeUpdates.availableSupplements.map((supp) => ({
           ...supp,
-          supplementId: typeof supp.supplementId === "string" && import_mongodb18.ObjectId.isValid(supp.supplementId) ? new import_mongodb18.ObjectId(supp.supplementId) : supp.supplementId
+          supplementId: typeof supp.supplementId === "string" && import_mongodb19.ObjectId.isValid(supp.supplementId) ? new import_mongodb19.ObjectId(supp.supplementId) : supp.supplementId
         }));
       } else {
         updateData.availableSupplements = safeUpdates.availableSupplements;
       }
     }
     if (safeUpdates.categoryId !== undefined && safeUpdates.categoryId !== null) {
-      updateData.categoryId = typeof safeUpdates.categoryId === "string" ? new import_mongodb18.ObjectId(safeUpdates.categoryId) : safeUpdates.categoryId;
+      updateData.categoryId = typeof safeUpdates.categoryId === "string" ? new import_mongodb19.ObjectId(safeUpdates.categoryId) : safeUpdates.categoryId;
     }
-    await db2.collection(this.collection).updateOne({ _id: new import_mongodb18.ObjectId(id) }, { $set: updateData });
+    await db2.collection(this.collection).updateOne({ _id: new import_mongodb19.ObjectId(id) }, { $set: updateData });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb18.ObjectId(id) });
+    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb19.ObjectId(id) });
   }
 };
 
 // src/models/BreakfastFormula.model.ts
 init_database();
-var import_mongodb19 = __toESM(require_lib5(), 1);
+var import_mongodb20 = __toESM(require_lib5(), 1);
 function toBreakfastFormula(doc) {
   if (!doc)
     return null;
@@ -77888,9 +78200,9 @@ var BreakfastFormulaModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb19.ObjectId.isValid(id))
+    if (!import_mongodb20.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb19.ObjectId(id) });
+    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb20.ObjectId(id) });
     return toBreakfastFormula(doc);
   },
   async findByType(type) {
@@ -77901,17 +78213,17 @@ var BreakfastFormulaModel = {
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection(this.collection).updateOne({ _id: new import_mongodb19.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection(this.collection).updateOne({ _id: new import_mongodb20.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb19.ObjectId(id) });
+    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb20.ObjectId(id) });
   }
 };
 
 // src/models/SupplementCategory.model.ts
 init_database();
-var import_mongodb20 = __toESM(require_lib5(), 1);
+var import_mongodb21 = __toESM(require_lib5(), 1);
 function toSupplementCategory(doc) {
   if (!doc)
     return null;
@@ -77951,19 +78263,19 @@ var SupplementCategoryModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb20.ObjectId.isValid(id))
+    if (!import_mongodb21.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb20.ObjectId(id) });
+    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb21.ObjectId(id) });
     return toSupplementCategory(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
     const { _id, id: ignoreId, createdAt, ...safeUpdates } = updates;
-    await db2.collection(this.collection).updateOne({ _id: new import_mongodb20.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
+    await db2.collection(this.collection).updateOne({ _id: new import_mongodb21.ObjectId(id) }, { $set: { ...safeUpdates, updatedAt: new Date } });
   },
   async delete(id) {
     const db2 = getDB();
-    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb20.ObjectId(id) });
+    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb21.ObjectId(id) });
   },
   async getSupplementsCount(id) {
     const db2 = getDB();
@@ -78266,52 +78578,6 @@ var breakfastCategoryService = new BreakfastCategoryService;
 var breakfastItemService = new BreakfastItemService;
 var breakfastFormulaService = new BreakfastFormulaService;
 
-// src/middleware/upload.middleware.ts
-var import_multer = __toESM(require_multer(), 1);
-import fs from "fs";
-import path from "path";
-var uploadsDir = path.join(process.cwd(), "uploads", "menu");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-var storage = import_multer.default.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
-    const base = path.basename(file.originalname || "image", ext).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    cb(null, `${Date.now()}-${base || "image"}${ext}`);
-  }
-});
-function fileFilter(_req, file, cb) {
-  if (!file.mimetype.startsWith("image/")) {
-    cb(new Error("Seuls les fichiers image sont autorises"));
-    return;
-  }
-  cb(null, true);
-}
-var uploadMenuImage = import_multer.default({
-  storage,
-  fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024
-  }
-});
-function getUploadedImagePath(file) {
-  if (!file)
-    return;
-  return `${file.filename}`;
-}
-function getLocalUploadAbsolutePath(imagePath) {
-  if (!imagePath)
-    return null;
-  if (imagePath.startsWith("/uploads/")) {
-    return path.join(process.cwd(), imagePath.replace(/^\//, "").replace(/\//g, path.sep));
-  }
-  return path.join(uploadsDir, imagePath);
-}
-
 // src/controllers/menu.controller.ts
 function getParamString3(param) {
   if (!param)
@@ -78320,7 +78586,7 @@ function getParamString3(param) {
     return param[0];
   return param;
 }
-function parseBoolean(value) {
+function parseBoolean2(value) {
   if (typeof value === "boolean")
     return value;
   if (typeof value === "string") {
@@ -78331,7 +78597,7 @@ function parseBoolean(value) {
   }
   return;
 }
-function parseNumber(value) {
+function parseNumber2(value) {
   if (typeof value === "number")
     return Number.isNaN(value) ? undefined : value;
   if (typeof value === "string" && value.trim() !== "") {
@@ -78355,7 +78621,7 @@ function parseJsonField(value, fallback) {
 function parseMenuItemPayload(req) {
   const body = req.body;
   const imageFromUpload = getUploadedImagePath(req.file);
-  const removeImage = parseBoolean(body.removeImage) === true;
+  const removeImage = parseBoolean2(body.removeImage) === true;
   const rawAvailableSupplements = body.availableSupplements ?? body.supplements;
   const result = {};
   if (typeof body.name === "string" && body.name.trim() !== "")
@@ -78363,15 +78629,15 @@ function parseMenuItemPayload(req) {
   if (typeof body.description === "string")
     result.description = body.description;
   if (body.price !== undefined && body.price !== null && body.price !== "")
-    result.price = parseNumber(body.price);
+    result.price = parseNumber2(body.price);
   if (body.points !== undefined && body.points !== null && body.points !== "")
-    result.points = parseNumber(body.points);
+    result.points = parseNumber2(body.points);
   if (typeof body.categoryId === "string" && body.categoryId.trim() !== "")
     result.categoryId = body.categoryId;
   if (body.allergens !== undefined)
     result.allergens = parseJsonField(body.allergens, []);
   if (body.isAvailable !== undefined && body.isAvailable !== null)
-    result.isAvailable = parseBoolean(body.isAvailable);
+    result.isAvailable = parseBoolean2(body.isAvailable);
   if (body.tags !== undefined)
     result.tags = parseJsonField(body.tags, undefined);
   if (rawAvailableSupplements !== undefined) {
@@ -78393,7 +78659,7 @@ function parseMenuItemPayload(req) {
 function parseBreakfastItemPayload(req) {
   const body = req.body;
   const imageFromUpload = getUploadedImagePath(req.file);
-  const removeImage = parseBoolean(body.removeImage) === true;
+  const removeImage = parseBoolean2(body.removeImage) === true;
   let availableSupplements = undefined;
   if (body.availableSupplements !== undefined && body.availableSupplements !== null && body.availableSupplements !== "") {
     try {
@@ -78413,19 +78679,19 @@ function parseBreakfastItemPayload(req) {
   if (body.description !== undefined && body.description !== null)
     result.description = body.description;
   if (body.price !== undefined && body.price !== null)
-    result.price = parseNumber(body.price);
+    result.price = parseNumber2(body.price);
   if (body.points !== undefined && body.points !== null)
-    result.points = parseNumber(body.points);
+    result.points = parseNumber2(body.points);
   if (body.categoryId !== undefined && body.categoryId !== null && body.categoryId !== "")
     result.categoryId = body.categoryId;
   if (body.isAvailable !== undefined && body.isAvailable !== null)
-    result.isAvailable = parseBoolean(body.isAvailable);
+    result.isAvailable = parseBoolean2(body.isAvailable);
   if (body.isRequired !== undefined && body.isRequired !== null)
-    result.isRequired = parseBoolean(body.isRequired);
+    result.isRequired = parseBoolean2(body.isRequired);
   if (body.minQuantity !== undefined && body.minQuantity !== null)
-    result.minQuantity = parseNumber(body.minQuantity);
+    result.minQuantity = parseNumber2(body.minQuantity);
   if (body.maxQuantity !== undefined && body.maxQuantity !== null)
-    result.maxQuantity = parseNumber(body.maxQuantity);
+    result.maxQuantity = parseNumber2(body.maxQuantity);
   if (availableSupplements !== undefined)
     result.availableSupplements = availableSupplements;
   if (removeImage) {
@@ -78440,20 +78706,20 @@ function parseBreakfastItemPayload(req) {
 function parseBreakfastFormulaPayload(req) {
   const body = req.body;
   const imageFromUpload = getUploadedImagePath(req.file);
-  const removeImage = parseBoolean(body.removeImage) === true;
+  const removeImage = parseBoolean2(body.removeImage) === true;
   const result = {};
   if (typeof body.name === "string" && body.name.trim() !== "")
     result.name = body.name;
   if (typeof body.description === "string")
     result.description = body.description;
   if (body.price !== undefined && body.price !== null && body.price !== "")
-    result.price = parseNumber(body.price);
+    result.price = parseNumber2(body.price);
   if (body.points !== undefined && body.points !== null && body.points !== "")
-    result.points = parseNumber(body.points);
+    result.points = parseNumber2(body.points);
   if (typeof body.type === "string" && body.type.trim() !== "")
     result.type = body.type;
   if (body.isActive !== undefined && body.isActive !== null)
-    result.isActive = parseBoolean(body.isActive);
+    result.isActive = parseBoolean2(body.isActive);
   if (removeImage) {
     result.image = undefined;
   } else if (imageFromUpload) {
@@ -78463,12 +78729,12 @@ function parseBreakfastFormulaPayload(req) {
   }
   return result;
 }
-async function removeLocalImageIfNeeded(imagePath) {
+async function removeLocalImageIfNeeded2(imagePath) {
   const absolutePath = getLocalUploadAbsolutePath(imagePath);
   if (!absolutePath)
     return;
   try {
-    await fs2.unlink(absolutePath);
+    await fs3.unlink(absolutePath);
   } catch {}
 }
 var MenuController = {
@@ -78623,8 +78889,8 @@ var MenuController = {
         recipeId: payload.recipeId ?? currentItem.recipeId
       };
       await menuItemService.updateItem(id, mergedPayload);
-      if ((req.file || parseBoolean(req.body.removeImage) === true) && currentItem.image !== mergedPayload.image) {
-        await removeLocalImageIfNeeded(currentItem.image);
+      if ((req.file || parseBoolean2(req.body.removeImage) === true) && currentItem.image !== mergedPayload.image) {
+        await removeLocalImageIfNeeded2(currentItem.image);
       }
       res.json({ success: true, message: "Article mis a jour avec succes" });
     } catch (error) {
@@ -78640,7 +78906,7 @@ var MenuController = {
       }
       const currentItem = await menuItemService.getItemById(id);
       await menuItemService.deleteItem(id);
-      await removeLocalImageIfNeeded(currentItem?.image);
+      await removeLocalImageIfNeeded2(currentItem?.image);
       res.json({ success: true, message: "Article supprime avec succes" });
     } catch (error) {
       console.error("Delete item error:", error);
@@ -78994,8 +79260,8 @@ var MenuController = {
         availableSupplements: payload.availableSupplements !== undefined ? payload.availableSupplements : currentItem.availableSupplements
       };
       await breakfastItemService.updateItem(id, mergedPayload);
-      if ((req.file || parseBoolean(req.body.removeImage) === true) && currentItem.image !== mergedPayload.image) {
-        await removeLocalImageIfNeeded(currentItem.image);
+      if ((req.file || parseBoolean2(req.body.removeImage) === true) && currentItem.image !== mergedPayload.image) {
+        await removeLocalImageIfNeeded2(currentItem.image);
       }
       res.json({ success: true, message: "Article petit dejeuner mis a jour avec succes" });
     } catch (error) {
@@ -79011,7 +79277,7 @@ var MenuController = {
       }
       const currentItem = await breakfastItemService.getItemById(id);
       await breakfastItemService.deleteItem(id);
-      await removeLocalImageIfNeeded(currentItem?.image);
+      await removeLocalImageIfNeeded2(currentItem?.image);
       res.json({ success: true, message: "Article petit dejeuner supprime avec succes" });
     } catch (error) {
       console.error("Delete breakfast item error:", error);
@@ -79066,8 +79332,8 @@ var MenuController = {
         isActive: payload.isActive ?? currentFormula.isActive
       };
       await breakfastFormulaService.updateFormula(id, mergedPayload);
-      if ((req.file || parseBoolean(req.body.removeImage) === true) && currentFormula.image !== mergedPayload.image) {
-        await removeLocalImageIfNeeded(currentFormula.image);
+      if ((req.file || parseBoolean2(req.body.removeImage) === true) && currentFormula.image !== mergedPayload.image) {
+        await removeLocalImageIfNeeded2(currentFormula.image);
       }
       res.json({ success: true, message: "Formule petit dejeuner mise a jour avec succes" });
     } catch (error) {
@@ -79083,7 +79349,7 @@ var MenuController = {
       }
       const currentFormula = await breakfastFormulaService.getFormulaById(id);
       await breakfastFormulaService.deleteFormula(id);
-      await removeLocalImageIfNeeded(currentFormula?.image);
+      await removeLocalImageIfNeeded2(currentFormula?.image);
       res.json({ success: true, message: "Formule petit dejeuner supprimee avec succes" });
     } catch (error) {
       console.error("Delete breakfast formula error:", error);
@@ -79150,7 +79416,7 @@ var menu_routes_default = router4;
 var import_express5 = __toESM(require_express2(), 1);
 
 // src/models/RemoteOrder.model.ts
-var import_mongodb21 = __toESM(require_lib5(), 1);
+var import_mongodb22 = __toESM(require_lib5(), 1);
 init_database();
 var DEFAULT_DELIVERY_CONFIG = {
   deliveryEnabled: true,
@@ -79240,17 +79506,17 @@ var RemoteOrderModel = {
   },
   async findById(id) {
     const db2 = getDB();
-    if (!import_mongodb21.ObjectId.isValid(id))
+    if (!import_mongodb22.ObjectId.isValid(id))
       return null;
-    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb21.ObjectId(id) });
+    const doc = await db2.collection(this.collection).findOne({ _id: new import_mongodb22.ObjectId(id) });
     return toRemoteOrder(doc);
   },
   async update(id, updates) {
     const db2 = getDB();
-    if (!import_mongodb21.ObjectId.isValid(id))
+    if (!import_mongodb22.ObjectId.isValid(id))
       throw new Error("ID invalide");
     const { _id, id: ignoredId, ...safeUpdates } = updates;
-    await db2.collection(this.collection).updateOne({ _id: new import_mongodb21.ObjectId(id) }, { $set: safeUpdates });
+    await db2.collection(this.collection).updateOne({ _id: new import_mongodb22.ObjectId(id) }, { $set: safeUpdates });
   },
   async getNextOrderNumber() {
     const db2 = getDB();
@@ -79279,9 +79545,9 @@ var DeliveryConfigModel = {
       ...updates,
       updatedAt: new Date
     };
-    if (current._id && import_mongodb21.ObjectId.isValid(current._id)) {
+    if (current._id && import_mongodb22.ObjectId.isValid(current._id)) {
       const { _id: _id2, ...persistedConfig } = nextConfig;
-      await db2.collection(this.collection).updateOne({ _id: new import_mongodb21.ObjectId(current._id) }, { $set: persistedConfig });
+      await db2.collection(this.collection).updateOne({ _id: new import_mongodb22.ObjectId(current._id) }, { $set: persistedConfig });
       return { ...nextConfig, _id: current._id };
     }
     const { _id, ...insertable } = nextConfig;
@@ -79516,8 +79782,8 @@ function isAllowedOrigin(origin) {
   }
   return false;
 }
-if (!fs3.existsSync(uploadsDir2)) {
-  fs3.mkdirSync(uploadsDir2, { recursive: true });
+if (!fs4.existsSync(uploadsDir2)) {
+  fs4.mkdirSync(uploadsDir2, { recursive: true });
 }
 app.use((req, res, next) => {
   const origin = req.headers.origin;
