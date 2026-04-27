@@ -15,11 +15,11 @@ router.delete('/recipe-categories/:id', adminOnly, ProductionController.deleteRe
 
 // Recipes
 router.get('/recipes', ProductionController.getAllRecipes)
+router.get('/recipes/check-ingredients', ProductionController.checkIngredients)
 router.get('/recipes/:id', ProductionController.getRecipeById)
 router.post('/recipes', adminOnly, ProductionController.createRecipe)
 router.put('/recipes/:id', adminOnly, ProductionController.updateRecipe)
 router.delete('/recipes/:id', adminOnly, ProductionController.deleteRecipe)
-router.get('/recipes/check-ingredients', ProductionController.checkIngredients)
 
 // Showcases
 router.get('/showcases', ProductionController.getAllShowcases)
