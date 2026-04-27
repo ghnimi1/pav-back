@@ -48,6 +48,20 @@ router.get('/alerts/expiring', StockController.getExpiringBatches)
 router.get('/stats', StockController.getStockStats)
 router.get('/stats/value', StockController.getTotalStockValue)
 
+// ========== STORAGE LOCATIONS ==========
+router.get('/storage-locations', StockController.getAllStorageLocations)
+router.get('/storage-locations/:id', StockController.getStorageLocationById)
+router.post('/storage-locations', adminOnly, StockController.createStorageLocation)
+router.put('/storage-locations/:id', adminOnly, StockController.updateStorageLocation)
+router.delete('/storage-locations/:id', adminOnly, StockController.deleteStorageLocation)
+
+// ========== SUPPLIERS ==========
+router.get('/suppliers', StockController.getAllSuppliers)
+router.get('/suppliers/:id', StockController.getSupplierById)
+router.post('/suppliers', adminOnly, StockController.createSupplier)
+router.put('/suppliers/:id', adminOnly, StockController.updateSupplier)
+router.delete('/suppliers/:id', adminOnly, StockController.deleteSupplier)
+
 // ========== REWARDS ==========
 router.get('/rewards', StockController.getAllRewards)
 router.get('/rewards/:id', StockController.getRewardById)

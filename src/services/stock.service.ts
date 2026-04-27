@@ -8,6 +8,10 @@ import { BatchModel } from '../models/Batch.model'
 import type { Batch } from '../models/Batch.model'
 import { RewardModel } from '../models/Reward.model'
 import type { Reward, RewardType } from '../models/Reward.model'
+import { StorageLocationModel } from '../models/StorageLocation.model'
+import type { StorageLocation, StorageLocationType } from '../models/StorageLocation.model'
+import { SupplierModel } from '../models/Supplier.model'
+import type { Supplier, SupplierStatus } from '../models/Supplier.model'
 import { getDB } from '../config/database'
 
 // ============================================
@@ -519,6 +523,121 @@ export class BatchService {
 }
 
 // ============================================
+// STORAGE LOCATION SERVICE
+// ============================================
+
+export class StorageLocationService {
+  async getAllStorageLocations(): Promise<StorageLocation[]> {
+    return StorageLocationModel.findAll()
+  }
+
+  async getStorageLocationById(id: string): Promise<StorageLocation | null> {
+    return StorageLocationModel.findById(id)
+  }
+
+  async createStorageLocation(data: {
+    name: string
+    type: StorageLocationType
+    description?: string
+    temperature?: string
+    capacity?: string
+    isActive?: boolean
+  }): Promise<StorageLocation> {
+    if (!data.name?.trim()) throw new Error('Nom de l\'emplacement requis')
+    return StorageLocationModel.create({
+      name: data.name.trim(),
+      type: data.type,
+      description: data.description?.trim() || undefined,
+      temperature: data.temperature?.trim() || undefined,
+      capacity: data.capacity?.trim() || undefined,
+      isActive: data.isActive,
+    })
+  }
+
+  async updateStorageLocation(id: string, data: Partial<StorageLocation>): Promise<void> {
+    const location = await StorageLocationModel.findById(id)
+    if (!location) throw new Error('Emplacement non trouvé')
+    await StorageLocationModel.update(id, {
+      ...data,
+      name: typeof data.name === 'string' ? data.name.trim() : data.name,
+      description: typeof data.description === 'string' ? data.description.trim() || undefined : data.description,
+      temperature: typeof data.temperature === 'string' ? data.temperature.trim() || undefined : data.temperature,
+      capacity: typeof data.capacity === 'string' ? data.capacity.trim() || undefined : data.capacity,
+    })
+  }
+
+  async deleteStorageLocation(id: string): Promise<void> {
+    const location = await StorageLocationModel.findById(id)
+    if (!location) throw new Error('Emplacement non trouvé')
+    const db = getDB()
+    const batchesCount = await db.collection('batches').countDocuments({ locationId: id })
+    if (batchesCount > 0) throw new Error(`Impossible de supprimer: ${batchesCount} lot(s) utilisent cet emplacement`)
+    await StorageLocationModel.delete(id)
+  }
+}
+
+// ============================================
+// SUPPLIER SERVICE
+// ============================================
+
+export class SupplierService {
+  async getAllSuppliers(): Promise<Supplier[]> {
+    return SupplierModel.findAll()
+  }
+
+  async getSupplierById(id: string): Promise<Supplier | null> {
+    return SupplierModel.findById(id)
+  }
+
+  async createSupplier(data: {
+    name: string
+    contactName?: string
+    email?: string
+    phone?: string
+    address?: string
+    notes?: string
+    status?: SupplierStatus
+  }): Promise<Supplier> {
+    if (!data.name?.trim()) throw new Error('Nom du fournisseur requis')
+    return SupplierModel.create({
+      name: data.name.trim(),
+      contactName: data.contactName?.trim() || undefined,
+      email: data.email?.trim() || undefined,
+      phone: data.phone?.trim() || undefined,
+      address: data.address?.trim() || undefined,
+      notes: data.notes?.trim() || undefined,
+      status: data.status || 'active',
+    })
+  }
+
+  async updateSupplier(id: string, data: Partial<Supplier>): Promise<void> {
+    const supplier = await SupplierModel.findById(id)
+    if (!supplier) throw new Error('Fournisseur non trouvé')
+    await SupplierModel.update(id, {
+      ...data,
+      name: typeof data.name === 'string' ? data.name.trim() : data.name,
+      contactName: typeof data.contactName === 'string' ? data.contactName.trim() || undefined : data.contactName,
+      email: typeof data.email === 'string' ? data.email.trim() || undefined : data.email,
+      phone: typeof data.phone === 'string' ? data.phone.trim() || undefined : data.phone,
+      address: typeof data.address === 'string' ? data.address.trim() || undefined : data.address,
+      notes: typeof data.notes === 'string' ? data.notes.trim() || undefined : data.notes,
+    })
+  }
+
+  async deleteSupplier(id: string): Promise<void> {
+    const supplier = await SupplierModel.findById(id)
+    if (!supplier) throw new Error('Fournisseur non trouvé')
+    const db = getDB()
+    const productsCount = await db.collection('products').countDocuments({ supplierId: id })
+    const batchesCount = await db.collection('batches').countDocuments({ supplierId: id })
+    if (productsCount > 0 || batchesCount > 0) {
+      throw new Error(`Impossible de supprimer: références existantes sur ${productsCount} produit(s) et ${batchesCount} lot(s)`)
+    }
+    await SupplierModel.delete(id)
+  }
+}
+
+// ============================================
 // REWARDS SERVICE
 // ============================================
 
@@ -608,4 +727,6 @@ export const categoryService = new CategoryService()
 export const subCategoryService = new SubCategoryService()
 export const productService = new ProductService()
 export const batchService = new BatchService()
+export const storageLocationService = new StorageLocationService()
+export const supplierService = new SupplierService()
 export const rewardService = new RewardService()

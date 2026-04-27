@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import type { Request, Response } from 'express'
-import { categoryService, subCategoryService, productService, batchService, rewardService } from '../services/stock.service'
+import { categoryService, subCategoryService, productService, batchService, rewardService, storageLocationService, supplierService } from '../services/stock.service'
 import { getLocalUploadAbsolutePath, getUploadedImagePath } from '../middleware/upload.middleware'
 
 // Helper function to get string from params
@@ -480,6 +480,128 @@ export const StockController = {
     } catch (error) {
       console.error('Get total stock value error:', error)
       res.status(500).json({ success: false, error: 'Erreur lors de la récupération' })
+    }
+  },
+
+  // ============================================
+  // STORAGE LOCATIONS
+  // ============================================
+
+  async getAllStorageLocations(req: Request, res: Response) {
+    try {
+      const locations = await storageLocationService.getAllStorageLocations()
+      res.json({ success: true, data: locations })
+    } catch (error) {
+      console.error('Get all storage locations error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la récupération des emplacements' })
+    }
+  },
+
+  async getStorageLocationById(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) return res.status(400).json({ success: false, error: 'ID requis' })
+      const location = await storageLocationService.getStorageLocationById(id)
+      if (!location) return res.status(404).json({ success: false, error: 'Emplacement non trouvé' })
+      res.json({ success: true, data: location })
+    } catch (error) {
+      console.error('Get storage location by id error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la récupération' })
+    }
+  },
+
+  async createStorageLocation(req: Request, res: Response) {
+    try {
+      const location = await storageLocationService.createStorageLocation(req.body)
+      res.status(201).json({ success: true, data: location, message: 'Emplacement créé avec succès' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la création'
+      res.status(400).json({ success: false, error: message })
+    }
+  },
+
+  async updateStorageLocation(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) return res.status(400).json({ success: false, error: 'ID requis' })
+      await storageLocationService.updateStorageLocation(id, req.body)
+      res.json({ success: true, message: 'Emplacement mis à jour avec succès' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la mise à jour'
+      res.status(400).json({ success: false, error: message })
+    }
+  },
+
+  async deleteStorageLocation(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) return res.status(400).json({ success: false, error: 'ID requis' })
+      await storageLocationService.deleteStorageLocation(id)
+      res.json({ success: true, message: 'Emplacement supprimé avec succès' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la suppression'
+      res.status(400).json({ success: false, error: message })
+    }
+  },
+
+  // ============================================
+  // SUPPLIERS
+  // ============================================
+
+  async getAllSuppliers(req: Request, res: Response) {
+    try {
+      const suppliers = await supplierService.getAllSuppliers()
+      res.json({ success: true, data: suppliers })
+    } catch (error) {
+      console.error('Get all suppliers error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la récupération des fournisseurs' })
+    }
+  },
+
+  async getSupplierById(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) return res.status(400).json({ success: false, error: 'ID requis' })
+      const supplier = await supplierService.getSupplierById(id)
+      if (!supplier) return res.status(404).json({ success: false, error: 'Fournisseur non trouvé' })
+      res.json({ success: true, data: supplier })
+    } catch (error) {
+      console.error('Get supplier by id error:', error)
+      res.status(500).json({ success: false, error: 'Erreur lors de la récupération' })
+    }
+  },
+
+  async createSupplier(req: Request, res: Response) {
+    try {
+      const supplier = await supplierService.createSupplier(req.body)
+      res.status(201).json({ success: true, data: supplier, message: 'Fournisseur créé avec succès' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la création'
+      res.status(400).json({ success: false, error: message })
+    }
+  },
+
+  async updateSupplier(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) return res.status(400).json({ success: false, error: 'ID requis' })
+      await supplierService.updateSupplier(id, req.body)
+      res.json({ success: true, message: 'Fournisseur mis à jour avec succès' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la mise à jour'
+      res.status(400).json({ success: false, error: message })
+    }
+  },
+
+  async deleteSupplier(req: Request, res: Response) {
+    try {
+      const id = getParamString(req.params.id)
+      if (!id) return res.status(400).json({ success: false, error: 'ID requis' })
+      await supplierService.deleteSupplier(id)
+      res.json({ success: true, message: 'Fournisseur supprimé avec succès' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la suppression'
+      res.status(400).json({ success: false, error: message })
     }
   },
 
