@@ -255,6 +255,93 @@ export const AuthController = {
     }
   },
 
+  async getGamesConfig(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const gamesConfig = await authService.getGamesConfig()
+      res.json({ gamesConfig })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async saveGamesConfig(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { gamesConfig } = req.body
+      if (!Array.isArray(gamesConfig)) {
+        return res.status(400).json({ error: 'gamesConfig invalide' })
+      }
+
+      const savedGamesConfig = await authService.saveGamesConfig(req.user.id, gamesConfig)
+      res.json({ gamesConfig: savedGamesConfig })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async getGamePlays(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const gamePlays = await authService.getGamePlays(req.user.id)
+      res.json({ gamePlays })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async createGamePlay(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { clientId, gameType, result, prize, playedAt } = req.body
+      if (!clientId || !gameType || !result) {
+        return res.status(400).json({ error: 'clientId, gameType et result requis' })
+      }
+
+      const gamePlay = await authService.createGamePlay(req.user.id, {
+        clientId,
+        gameType,
+        result,
+        prize,
+        playedAt,
+      })
+      res.status(201).json({ gamePlay })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async resetGamePlays(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const clientId = typeof req.query.clientId === 'string' ? req.query.clientId : undefined
+      await authService.resetGamePlays(req.user.id, clientId)
+      res.json({ success: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
   async updateReferralConfig(req: Request, res: Response) {
     try {
       if (!req.user) {

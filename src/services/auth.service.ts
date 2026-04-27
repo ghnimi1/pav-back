@@ -88,6 +88,41 @@ export interface ClientMissionRecord {
   createdAt: string
 }
 
+export interface GameRewardRecord {
+  id: string
+  name: string
+  points: number
+  probability: number
+  color: string
+}
+
+export interface GameConfigRecord {
+  id: string
+  name: string
+  icon: 'roulette' | 'chichbich'
+  enabled: boolean
+  startHour: number
+  endHour: number
+  maxPlaysPerDay: number
+  minPointsRequired: number
+  rewards: GameRewardRecord[]
+}
+
+export interface GamePlayPrizeRecord {
+  type: 'points' | 'discount' | 'free_item'
+  value: number
+  description: string
+}
+
+export interface GamePlayRecord {
+  id: string
+  clientId: string
+  gameType: 'roulette' | 'chichbich' | 'share_spin'
+  result: 'win' | 'lose'
+  prize?: GamePlayPrizeRecord
+  playedAt: string
+}
+
 export interface ReferralRecord {
   id: string
   referrerId: string
@@ -185,6 +220,41 @@ export class AuthService {
       createdAt: new Date().toISOString(),
     },
   ]
+  private readonly defaultGamesConfig: GameConfigRecord[] = [
+    {
+      id: 'roulette',
+      name: 'Roulette de la Chance',
+      icon: 'roulette',
+      enabled: true,
+      startHour: 10,
+      endHour: 14,
+      maxPlaysPerDay: 3,
+      minPointsRequired: 50,
+      rewards: [
+        { id: 'r1', name: '5 Points Bonus', points: 5, probability: 30, color: '#22c55e' },
+        { id: 'r2', name: '10 Points Bonus', points: 10, probability: 25, color: '#3b82f6' },
+        { id: 'r3', name: '25 Points Bonus', points: 25, probability: 15, color: '#a855f7' },
+        { id: 'r4', name: '50 Points Bonus', points: 50, probability: 8, color: '#f59e0b' },
+        { id: 'r5', name: '100 Points Bonus', points: 100, probability: 2, color: '#ef4444' },
+        { id: 'r6', name: 'Rejouer', points: 0, probability: 20, color: '#64748b' },
+      ],
+    },
+    {
+      id: 'chichbich',
+      name: 'Chichbich (Des Tunisiens)',
+      icon: 'chichbich',
+      enabled: true,
+      startHour: 18,
+      endHour: 22,
+      maxPlaysPerDay: 2,
+      minPointsRequired: 100,
+      rewards: [
+        { id: 'c1', name: 'Double (x2)', points: 20, probability: 16.67, color: '#22c55e' },
+        { id: 'c2', name: 'Triple', points: 50, probability: 2.78, color: '#f59e0b' },
+        { id: 'c3', name: 'Chichbich!', points: 200, probability: 0.46, color: '#ef4444' },
+      ],
+    },
+  ]
 
   private sanitizeUser(user: User): Omit<User, 'password'> {
     const { password, ...userWithoutPassword } = user
@@ -208,6 +278,14 @@ export class AuthService {
 
   private clientMissionsCollection() {
     return getDB().collection('client_missions')
+  }
+
+  private gamesConfigCollection() {
+    return getDB().collection('games_config')
+  }
+
+  private gamePlaysCollection() {
+    return getDB().collection('game_plays')
   }
 
   private mapMission(doc: any): MissionRecord {
@@ -254,6 +332,45 @@ export class AuthService {
     }
   }
 
+  private mapGameConfig(doc: any): GameConfigRecord {
+    return {
+      id: String(doc.id || doc._id || ''),
+      name: doc.name || '',
+      icon: doc.icon || 'roulette',
+      enabled: doc.enabled ?? true,
+      startHour: doc.startHour ?? 0,
+      endHour: doc.endHour ?? 23,
+      maxPlaysPerDay: doc.maxPlaysPerDay ?? 1,
+      minPointsRequired: doc.minPointsRequired ?? 0,
+      rewards: Array.isArray(doc.rewards)
+        ? doc.rewards.map((reward: any) => ({
+            id: String(reward.id || ''),
+            name: reward.name || '',
+            points: reward.points || 0,
+            probability: reward.probability || 0,
+            color: reward.color || '#64748b',
+          }))
+        : [],
+    }
+  }
+
+  private mapGamePlay(doc: any): GamePlayRecord {
+    return {
+      id: doc._id.toString(),
+      clientId: String(doc.clientId || ''),
+      gameType: doc.gameType || 'roulette',
+      result: doc.result || 'lose',
+      prize: doc.prize
+        ? {
+            type: doc.prize.type || 'points',
+            value: doc.prize.value || 0,
+            description: doc.prize.description || '',
+          }
+        : undefined,
+      playedAt: doc.playedAt ? new Date(doc.playedAt).toISOString() : new Date().toISOString(),
+    }
+  }
+
   private async ensureDefaultMissions() {
     const collection = this.missionCollection()
     const count = await collection.countDocuments()
@@ -266,6 +383,13 @@ export class AuthService {
     const count = await collection.countDocuments()
     if (count > 0) return
     await collection.insertMany(this.defaultSpecialDays.map((day) => ({ ...day, createdAt: new Date(day.createdAt) })))
+  }
+
+  private async ensureDefaultGamesConfig() {
+    const collection = this.gamesConfigCollection()
+    const count = await collection.countDocuments()
+    if (count > 0) return
+    await collection.insertMany(this.defaultGamesConfig)
   }
 
   private async getReferralConfigDocument() {
@@ -420,6 +544,76 @@ export class AuthService {
     })
     const created = await this.clientMissionsCollection().findOne({ _id: result.insertedId })
     return this.mapClientMission(created)
+  }
+
+  async getGamesConfig(): Promise<GameConfigRecord[]> {
+    await this.ensureDefaultGamesConfig()
+    const docs = await this.gamesConfigCollection().find({}).sort({ id: 1 }).toArray()
+    return docs.map((doc) => this.mapGameConfig(doc))
+  }
+
+  async saveGamesConfig(actorId: string, configs: GameConfigRecord[]): Promise<GameConfigRecord[]> {
+    await this.assertAdmin(actorId)
+    const collection = this.gamesConfigCollection()
+    await collection.deleteMany({})
+    if (configs.length > 0) {
+      await collection.insertMany(
+        configs.map((config) => ({
+          id: config.id,
+          name: config.name,
+          icon: config.icon,
+          enabled: config.enabled,
+          startHour: config.startHour,
+          endHour: config.endHour,
+          maxPlaysPerDay: config.maxPlaysPerDay,
+          minPointsRequired: config.minPointsRequired,
+          rewards: config.rewards,
+        }))
+      )
+    }
+    return this.getGamesConfig()
+  }
+
+  async getGamePlays(actorId: string): Promise<GamePlayRecord[]> {
+    const actor = await UserModel.findById(actorId)
+    if (!actor) throw new Error('Utilisateur non trouve')
+    const query = actor.role === 'admin' ? {} : { clientId: actorId }
+    const docs = await this.gamePlaysCollection().find(query).sort({ playedAt: -1 }).toArray()
+    return docs.map((doc) => this.mapGamePlay(doc))
+  }
+
+  async createGamePlay(
+    actorId: string,
+    payload: Omit<GamePlayRecord, 'id' | 'playedAt'> & { playedAt?: string }
+  ): Promise<GamePlayRecord> {
+    await this.assertLoyaltyAccess(actorId, payload.clientId)
+    const result = await this.gamePlaysCollection().insertOne({
+      clientId: payload.clientId,
+      gameType: payload.gameType,
+      result: payload.result,
+      prize: payload.prize,
+      playedAt: payload.playedAt ? new Date(payload.playedAt) : new Date(),
+    })
+    const created = await this.gamePlaysCollection().findOne({ _id: result.insertedId })
+    return this.mapGamePlay(created)
+  }
+
+  async resetGamePlays(actorId: string, clientId?: string): Promise<void> {
+    const actor = await UserModel.findById(actorId)
+    if (!actor) throw new Error('Utilisateur non trouve')
+
+    if (clientId && actor.role !== 'admin') {
+      await this.assertLoyaltyAccess(actorId, clientId)
+      await this.gamePlaysCollection().deleteMany({ clientId })
+      return
+    }
+
+    if (actor.role !== 'admin') {
+      await this.gamePlaysCollection().deleteMany({ clientId: actorId })
+      return
+    }
+
+    await this.gamePlaysCollection().deleteMany(clientId ? { clientId } : {})
   }
 
   private async assertEmployeeManagementAccess(actorId: string): Promise<User> {
