@@ -369,6 +369,95 @@ export const AuthController = {
     }
   },
 
+  async getLoyaltyCards(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const visitorId = typeof req.query.visitorId === 'string' ? req.query.visitorId : undefined
+      const result = await authService.getLoyaltyCards(req.user.id, visitorId)
+      res.json(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async updateLoyaltyCardSettings(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const result = await authService.updateLoyaltyCardSettings(req.user.id, {
+        isEnabled: req.body.isEnabled,
+        cardConfigs: req.body.cardConfigs,
+      })
+      res.json(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async addLoyaltyCardStamp(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { visitorId, orderId, items } = req.body
+      if (!visitorId || !orderId || !Array.isArray(items)) {
+        return res.status(400).json({ error: 'visitorId, orderId et items requis' })
+      }
+
+      const result = await authService.addLoyaltyCardStamp(req.user.id, { visitorId, orderId, items })
+      res.json(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async playLoyaltyCardGame(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { cardId, position } = req.body
+      if (!cardId || typeof position !== 'number') {
+        return res.status(400).json({ error: 'cardId et position requis' })
+      }
+
+      const gameResult = await authService.playLoyaltyCardGame(req.user.id, { cardId, position })
+      res.json({ gameResult })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async claimLoyaltyCardReward(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { cardId, position, productId } = req.body
+      if (!cardId || typeof position !== 'number' || !productId) {
+        return res.status(400).json({ error: 'cardId, position et productId requis' })
+      }
+
+      const success = await authService.claimLoyaltyCardReward(req.user.id, { cardId, position, productId })
+      res.json({ success })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
   async awardLoyaltyPoints(req: Request, res: Response) {
     try {
       if (!req.user) {

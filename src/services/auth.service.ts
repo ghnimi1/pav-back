@@ -139,6 +139,73 @@ export interface ReferralRecord {
   completedAt?: string
 }
 
+export interface LoyaltyStampPositionRecord {
+  position: number
+  type: 'normal' | 'game' | 'reward'
+  gameConfig?: {
+    gameName: string
+    chances: number
+    winCondition: 'double-6' | 'double-any' | 'sum-12'
+    rewardProductIds: string[]
+  }
+  rewardConfig?: {
+    rewardProductIds: string[]
+    rewardText: string
+  }
+}
+
+export interface LoyaltyCardConfigRecord {
+  id: string
+  name: string
+  description: string
+  productName: string
+  productPrice: number
+  eligibleProductIds: string[]
+  totalStamps: number
+  stampPositions: LoyaltyStampPositionRecord[]
+  expirationDays: number
+  backgroundColor: 'dark' | 'light'
+  stampIcon: 'cup' | 'croissant' | 'custom'
+  customStampImage?: string
+  gridColumns: number
+  isActive: boolean
+  autoRenew: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LoyaltyCardGameResultRecord {
+  played: boolean
+  won: boolean
+  diceResults: [number, number][]
+  finalDice?: [number, number]
+  rewardProductId?: string
+  playedAt: string
+}
+
+export interface LoyaltyCustomerStampRecord {
+  position: number
+  stampedAt: string
+  orderId: string
+  productId: string
+  productName: string
+  gameResult?: LoyaltyCardGameResultRecord
+  rewardClaimed?: boolean
+  rewardProductId?: string
+}
+
+export interface LoyaltyCustomerCardRecord {
+  id: string
+  configId: string
+  visitorId: string
+  stamps: LoyaltyCustomerStampRecord[]
+  currentStampCount: number
+  status: 'active' | 'completed' | 'expired'
+  expirationDate: string
+  createdAt: string
+  completedAt?: string
+}
+
 export interface AuthResponse {
   token: string
   user: Omit<User, 'password'>
@@ -288,6 +355,14 @@ export class AuthService {
     return getDB().collection('game_plays')
   }
 
+  private loyaltyCardSettingsCollection() {
+    return getDB().collection('loyalty_card_settings')
+  }
+
+  private loyaltyCustomerCardsCollection() {
+    return getDB().collection('loyalty_customer_cards')
+  }
+
   private mapMission(doc: any): MissionRecord {
     return {
       id: doc._id.toString(),
@@ -369,6 +444,219 @@ export class AuthService {
         : undefined,
       playedAt: doc.playedAt ? new Date(doc.playedAt).toISOString() : new Date().toISOString(),
     }
+  }
+
+  private getDefaultLoyaltyCardConfigs(): LoyaltyCardConfigRecord[] {
+    const now = new Date().toISOString()
+
+    return [
+      {
+        id: 'card-cafe-1',
+        name: 'Passeport Cafe',
+        description: 'Cumulez vos cafes et tentez votre chance',
+        productName: 'Cafe Importe',
+        productPrice: 2,
+        eligibleProductIds: [],
+        totalStamps: 18,
+        stampPositions: Array.from({ length: 18 }, (_, index) => {
+          const position = index + 1
+          if (position === 6 || position === 12) {
+            return {
+              position,
+              type: 'game' as const,
+              gameConfig: {
+                gameName: 'Chich Bich',
+                chances: 3,
+                winCondition: 'double-6' as const,
+                rewardProductIds: [],
+              },
+            }
+          }
+
+          if (position === 18) {
+            return {
+              position,
+              type: 'reward' as const,
+              rewardConfig: {
+                rewardProductIds: [],
+                rewardText: 'Cafe Offert',
+              },
+            }
+          }
+
+          return { position, type: 'normal' as const }
+        }),
+        expirationDays: 90,
+        backgroundColor: 'light',
+        stampIcon: 'cup',
+        gridColumns: 4,
+        isActive: true,
+        autoRenew: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'card-formule-1',
+        name: 'Passeport Formule',
+        description: 'Cumulez vos formules et gagnez des recompenses',
+        productName: 'Formule Importee',
+        productPrice: 4.3,
+        eligibleProductIds: [],
+        totalStamps: 18,
+        stampPositions: Array.from({ length: 18 }, (_, index) => {
+          const position = index + 1
+          if (position === 6 || position === 12) {
+            return {
+              position,
+              type: 'game' as const,
+              gameConfig: {
+                gameName: 'Chich Bich',
+                chances: 3,
+                winCondition: 'double-6' as const,
+                rewardProductIds: [],
+              },
+            }
+          }
+
+          if (position === 11) {
+            return {
+              position,
+              type: 'reward' as const,
+              rewardConfig: {
+                rewardProductIds: [],
+                rewardText: 'Boisson Chaude Offerte',
+              },
+            }
+          }
+
+          if (position === 18) {
+            return {
+              position,
+              type: 'reward' as const,
+              rewardConfig: {
+                rewardProductIds: [],
+                rewardText: 'Formule Offerte',
+              },
+            }
+          }
+
+          return { position, type: 'normal' as const }
+        }),
+        expirationDays: 90,
+        backgroundColor: 'light',
+        stampIcon: 'croissant',
+        gridColumns: 4,
+        isActive: true,
+        autoRenew: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]
+  }
+
+  private mapLoyaltyCardConfig(doc: any): LoyaltyCardConfigRecord {
+    return {
+      id: String(doc.id || doc._id || ''),
+      name: doc.name || '',
+      description: doc.description || '',
+      productName: doc.productName || '',
+      productPrice: Number(doc.productPrice || 0),
+      eligibleProductIds: Array.isArray(doc.eligibleProductIds) ? doc.eligibleProductIds.map(String) : [],
+      totalStamps: Number(doc.totalStamps || 0),
+      stampPositions: Array.isArray(doc.stampPositions)
+        ? doc.stampPositions.map((position: any) => ({
+            position: Number(position.position || 0),
+            type: position.type || 'normal',
+            gameConfig: position.gameConfig
+              ? {
+                  gameName: position.gameConfig.gameName || 'Chich Bich',
+                  chances: Number(position.gameConfig.chances || 3),
+                  winCondition: position.gameConfig.winCondition || 'double-6',
+                  rewardProductIds: Array.isArray(position.gameConfig.rewardProductIds)
+                    ? position.gameConfig.rewardProductIds.map(String)
+                    : [],
+                }
+              : undefined,
+            rewardConfig: position.rewardConfig
+              ? {
+                  rewardProductIds: Array.isArray(position.rewardConfig.rewardProductIds)
+                    ? position.rewardConfig.rewardProductIds.map(String)
+                    : [],
+                  rewardText: position.rewardConfig.rewardText || '',
+                }
+              : undefined,
+          }))
+        : [],
+      expirationDays: Number(doc.expirationDays || 90),
+      backgroundColor: doc.backgroundColor === 'dark' ? 'dark' : 'light',
+      stampIcon: doc.stampIcon || 'cup',
+      customStampImage: doc.customStampImage,
+      gridColumns: Number(doc.gridColumns || 4),
+      isActive: doc.isActive ?? true,
+      autoRenew: doc.autoRenew ?? true,
+      createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+      updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : new Date().toISOString(),
+    }
+  }
+
+  private mapLoyaltyCustomerCard(doc: any): LoyaltyCustomerCardRecord {
+    return {
+      id: String(doc.id || doc._id || ''),
+      configId: String(doc.configId || ''),
+      visitorId: String(doc.visitorId || ''),
+      stamps: Array.isArray(doc.stamps)
+        ? doc.stamps.map((stamp: any) => ({
+            position: Number(stamp.position || 0),
+            stampedAt: stamp.stampedAt ? new Date(stamp.stampedAt).toISOString() : new Date().toISOString(),
+            orderId: String(stamp.orderId || ''),
+            productId: String(stamp.productId || ''),
+            productName: stamp.productName || '',
+            gameResult: stamp.gameResult
+              ? {
+                  played: Boolean(stamp.gameResult.played),
+                  won: Boolean(stamp.gameResult.won),
+                  diceResults: Array.isArray(stamp.gameResult.diceResults)
+                    ? stamp.gameResult.diceResults.map((dice: any) => [Number(dice[0] || 0), Number(dice[1] || 0)] as [number, number])
+                    : [],
+                  finalDice: Array.isArray(stamp.gameResult.finalDice)
+                    ? [Number(stamp.gameResult.finalDice[0] || 0), Number(stamp.gameResult.finalDice[1] || 0)]
+                    : undefined,
+                  rewardProductId: stamp.gameResult.rewardProductId ? String(stamp.gameResult.rewardProductId) : undefined,
+                  playedAt: stamp.gameResult.playedAt
+                    ? new Date(stamp.gameResult.playedAt).toISOString()
+                    : new Date().toISOString(),
+                }
+              : undefined,
+            rewardClaimed: stamp.rewardClaimed,
+            rewardProductId: stamp.rewardProductId ? String(stamp.rewardProductId) : undefined,
+          }))
+        : [],
+      currentStampCount: Number(doc.currentStampCount || 0),
+      status: doc.status || 'active',
+      expirationDate: doc.expirationDate ? new Date(doc.expirationDate).toISOString() : new Date().toISOString(),
+      createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+      completedAt: doc.completedAt ? new Date(doc.completedAt).toISOString() : undefined,
+    }
+  }
+
+  private async ensureLoyaltyCardSettings() {
+    const collection = this.loyaltyCardSettingsCollection()
+    const existing = await collection.findOne({})
+    if (existing) return existing
+
+    const defaults = {
+      isEnabled: true,
+      cardConfigs: this.getDefaultLoyaltyCardConfigs(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+
+    await collection.insertOne(defaults)
+    return collection.findOne({})
+  }
+
+  private async getLoyaltyCardSettingsDocument() {
+    return (await this.ensureLoyaltyCardSettings()) || { isEnabled: true, cardConfigs: this.getDefaultLoyaltyCardConfigs() }
   }
 
   private async ensureDefaultMissions() {
@@ -644,6 +932,324 @@ export class AuthService {
     if (!isSelf && !isAdmin) {
       throw new Error('Acces refuse')
     }
+  }
+
+  async getLoyaltyCards(actorId: string, visitorId?: string): Promise<{
+    isEnabled: boolean
+    cardConfigs: LoyaltyCardConfigRecord[]
+    customerCards: LoyaltyCustomerCardRecord[]
+  }> {
+    const actor = await UserModel.findById(actorId)
+    if (!actor) {
+      throw new Error('Utilisateur non trouve')
+    }
+
+    const settings = await this.getLoyaltyCardSettingsDocument()
+    const cardConfigs = Array.isArray(settings.cardConfigs)
+      ? settings.cardConfigs.map((config: any) => this.mapLoyaltyCardConfig(config))
+      : this.getDefaultLoyaltyCardConfigs()
+
+    const targetVisitorId = visitorId || actorId
+    const query = actor.role === 'admin' ? (visitorId ? { visitorId } : {}) : { visitorId: actorId }
+    const customerCards = (await this.loyaltyCustomerCardsCollection().find(query).sort({ createdAt: -1 }).toArray())
+      .map((card) => this.mapLoyaltyCustomerCard(card))
+      .filter((card) => actor.role === 'admin' || card.visitorId === targetVisitorId)
+
+    return {
+      isEnabled: settings.isEnabled ?? true,
+      cardConfigs,
+      customerCards,
+    }
+  }
+
+  async updateLoyaltyCardSettings(
+    actorId: string,
+    payload: { isEnabled?: boolean; cardConfigs?: LoyaltyCardConfigRecord[] }
+  ): Promise<{
+    isEnabled: boolean
+    cardConfigs: LoyaltyCardConfigRecord[]
+  }> {
+    await this.assertAdmin(actorId)
+
+    const existing = await this.getLoyaltyCardSettingsDocument()
+    const nextCardConfigs = Array.isArray(payload.cardConfigs)
+      ? payload.cardConfigs.map((config) => this.mapLoyaltyCardConfig(config))
+      : Array.isArray(existing.cardConfigs)
+        ? existing.cardConfigs.map((config: any) => this.mapLoyaltyCardConfig(config))
+        : this.getDefaultLoyaltyCardConfigs()
+
+    const nextIsEnabled = typeof payload.isEnabled === 'boolean' ? payload.isEnabled : existing.isEnabled ?? true
+
+    await this.loyaltyCardSettingsCollection().updateOne(
+      { _id: existing._id },
+      {
+        $set: {
+          isEnabled: nextIsEnabled,
+          cardConfigs: nextCardConfigs,
+          updatedAt: new Date(),
+        },
+      }
+    )
+
+    return {
+      isEnabled: nextIsEnabled,
+      cardConfigs: nextCardConfigs,
+    }
+  }
+
+  async addLoyaltyCardStamp(
+    actorId: string,
+    payload: {
+      visitorId: string
+      orderId: string
+      items: Array<{ productId: string; productName: string; quantity?: number }>
+    }
+  ): Promise<{
+    stamped: boolean
+    results: Array<{
+      card: LoyaltyCustomerCardRecord
+      position: number
+      positionType: 'normal' | 'game' | 'reward'
+    }>
+  }> {
+    await this.assertLoyaltyAccess(actorId, payload.visitorId)
+
+    const settings = await this.getLoyaltyCardSettingsDocument()
+    const cardConfigs = Array.isArray(settings.cardConfigs)
+      ? settings.cardConfigs.map((config: any) => this.mapLoyaltyCardConfig(config))
+      : []
+
+    if (!(settings.isEnabled ?? true)) {
+      return { stamped: false, results: [] }
+    }
+
+    const results: Array<{
+      card: LoyaltyCustomerCardRecord
+      position: number
+      positionType: 'normal' | 'game' | 'reward'
+    }> = []
+
+    for (const item of payload.items) {
+      const quantity = Math.max(1, Number(item.quantity || 1))
+      for (let index = 0; index < quantity; index += 1) {
+        const eligibleConfigs = cardConfigs.filter(
+          (config) =>
+            config.isActive &&
+            config.eligibleProductIds.some((eligibleId) => {
+              const normalizedEligibleId = String(eligibleId)
+              const normalizedProductId = String(item.productId)
+              return (
+                normalizedEligibleId === normalizedProductId ||
+                normalizedEligibleId === `breakfast-${normalizedProductId}` ||
+                normalizedEligibleId.replace(/^breakfast-/, '') === normalizedProductId
+              )
+            })
+        )
+
+        for (const config of eligibleConfigs) {
+          const now = new Date()
+          const existingCardDoc = await this.loyaltyCustomerCardsCollection().findOne({
+            visitorId: payload.visitorId,
+            configId: config.id,
+            status: 'active',
+          })
+
+          let card = existingCardDoc ? this.mapLoyaltyCustomerCard(existingCardDoc) : null
+
+          if (!card) {
+            const expirationDate = new Date(now)
+            expirationDate.setDate(expirationDate.getDate() + config.expirationDays)
+            const newCard: LoyaltyCustomerCardRecord = {
+              id: `customer-card-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+              configId: config.id,
+              visitorId: payload.visitorId,
+              stamps: [],
+              currentStampCount: 0,
+              status: 'active',
+              expirationDate: expirationDate.toISOString(),
+              createdAt: now.toISOString(),
+            }
+
+            await this.loyaltyCustomerCardsCollection().insertOne({
+              ...newCard,
+              expirationDate: new Date(newCard.expirationDate),
+              createdAt: new Date(newCard.createdAt),
+            })
+            card = newCard
+          }
+
+          const nextPosition = card.currentStampCount + 1
+          if (nextPosition > config.totalStamps) {
+            continue
+          }
+
+          const positionConfig = config.stampPositions.find((position) => position.position === nextPosition)
+          const newStamp: LoyaltyCustomerStampRecord = {
+            position: nextPosition,
+            stampedAt: now.toISOString(),
+            orderId: payload.orderId,
+            productId: String(item.productId),
+            productName: item.productName,
+          }
+
+          const updatedCard: LoyaltyCustomerCardRecord = {
+            ...card,
+            stamps: [...card.stamps, newStamp],
+            currentStampCount: nextPosition,
+            status: nextPosition >= config.totalStamps ? 'completed' : 'active',
+            completedAt: nextPosition >= config.totalStamps ? now.toISOString() : undefined,
+          }
+
+          await this.loyaltyCustomerCardsCollection().updateOne(
+            { id: updatedCard.id },
+            {
+              $set: {
+                stamps: updatedCard.stamps,
+                currentStampCount: updatedCard.currentStampCount,
+                status: updatedCard.status,
+                completedAt: updatedCard.completedAt ? new Date(updatedCard.completedAt) : undefined,
+              },
+            }
+          )
+
+          if (updatedCard.status === 'completed' && config.autoRenew) {
+            const renewalExpiration = new Date(now)
+            renewalExpiration.setDate(renewalExpiration.getDate() + config.expirationDays)
+            await this.loyaltyCustomerCardsCollection().insertOne({
+              id: `customer-card-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+              configId: config.id,
+              visitorId: payload.visitorId,
+              stamps: [],
+              currentStampCount: 0,
+              status: 'active',
+              expirationDate: renewalExpiration,
+              createdAt: now,
+            })
+          }
+
+          results.push({
+            card: updatedCard,
+            position: nextPosition,
+            positionType: positionConfig?.type || 'normal',
+          })
+        }
+      }
+    }
+
+    return {
+      stamped: results.length > 0,
+      results,
+    }
+  }
+
+  async playLoyaltyCardGame(
+    actorId: string,
+    payload: { cardId: string; position: number }
+  ): Promise<LoyaltyCardGameResultRecord> {
+    const cardDoc = await this.loyaltyCustomerCardsCollection().findOne({ id: payload.cardId })
+    if (!cardDoc) {
+      throw new Error('Carte introuvable')
+    }
+
+    const card = this.mapLoyaltyCustomerCard(cardDoc)
+    await this.assertLoyaltyAccess(actorId, card.visitorId)
+
+    const settings = await this.getLoyaltyCardSettingsDocument()
+    const config = (Array.isArray(settings.cardConfigs) ? settings.cardConfigs : [])
+      .map((entry: any) => this.mapLoyaltyCardConfig(entry))
+      .find((entry) => entry.id === card.configId)
+
+    if (!config) {
+      throw new Error('Configuration de carte introuvable')
+    }
+
+    const positionConfig = config.stampPositions.find((position) => position.position === payload.position)
+    const stamp = card.stamps.find((entry) => entry.position === payload.position)
+
+    if (!positionConfig || positionConfig.type !== 'game' || !positionConfig.gameConfig || !stamp) {
+      throw new Error('Position de jeu invalide')
+    }
+
+    if (stamp.gameResult?.played) {
+      return stamp.gameResult
+    }
+
+    const rollDice = (): [number, number] => [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1]
+    const hasWon = (dice: [number, number]) => {
+      switch (positionConfig.gameConfig?.winCondition) {
+        case 'double-any':
+          return dice[0] === dice[1]
+        case 'sum-12':
+          return dice[0] + dice[1] === 12
+        case 'double-6':
+        default:
+          return dice[0] === 6 && dice[1] === 6
+      }
+    }
+
+    const diceResults: [number, number][] = []
+    let finalDice: [number, number] | undefined
+    let won = false
+
+    for (let index = 0; index < positionConfig.gameConfig.chances; index += 1) {
+      const dice = rollDice()
+      diceResults.push(dice)
+      finalDice = dice
+      if (hasWon(dice)) {
+        won = true
+        break
+      }
+    }
+
+    const gameResult: LoyaltyCardGameResultRecord = {
+      played: true,
+      won,
+      diceResults,
+      finalDice,
+      rewardProductId: won ? positionConfig.gameConfig.rewardProductIds[0] : undefined,
+      playedAt: new Date().toISOString(),
+    }
+
+    const updatedStamps = card.stamps.map((entry) =>
+      entry.position === payload.position ? { ...entry, gameResult } : entry
+    )
+
+    await this.loyaltyCustomerCardsCollection().updateOne(
+      { id: card.id },
+      { $set: { stamps: updatedStamps } }
+    )
+
+    return gameResult
+  }
+
+  async claimLoyaltyCardReward(
+    actorId: string,
+    payload: { cardId: string; position: number; productId: string }
+  ): Promise<boolean> {
+    const cardDoc = await this.loyaltyCustomerCardsCollection().findOne({ id: payload.cardId })
+    if (!cardDoc) {
+      throw new Error('Carte introuvable')
+    }
+
+    const card = this.mapLoyaltyCustomerCard(cardDoc)
+    await this.assertLoyaltyAccess(actorId, card.visitorId)
+
+    const stamp = card.stamps.find((entry) => entry.position === payload.position)
+    if (!stamp) {
+      return false
+    }
+
+    await this.loyaltyCustomerCardsCollection().updateOne(
+      { id: card.id, 'stamps.position': payload.position },
+      {
+        $set: {
+          'stamps.$.rewardClaimed': true,
+          'stamps.$.rewardProductId': payload.productId,
+        },
+      }
+    )
+
+    return true
   }
 
   async login(input: LoginInput): Promise<AuthResponse> {
