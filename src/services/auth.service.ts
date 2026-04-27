@@ -50,6 +50,44 @@ export interface ReferralConfig {
   referredReward: number
 }
 
+export interface MissionRecord {
+  id: string
+  name: string
+  description: string
+  type: 'visit' | 'spend' | 'refer' | 'birthday' | 'review' | 'social' | 'challenge'
+  target: number
+  reward: number
+  bonusReward?: number
+  validFrom: string
+  validUntil: string
+  isActive: boolean
+  icon?: string
+  createdAt: string
+}
+
+export interface SpecialDayRecord {
+  id: string
+  name: string
+  description: string
+  targetGender?: 'male' | 'female' | 'other'
+  dayOfWeek?: number
+  specificDate?: string
+  multiplier: number
+  bonusPoints?: number
+  isActive: boolean
+  createdAt: string
+}
+
+export interface ClientMissionRecord {
+  id: string
+  clientId: string
+  missionId: string
+  progress: number
+  status: 'active' | 'completed' | 'expired'
+  completedAt?: string
+  createdAt: string
+}
+
 export interface ReferralRecord {
   id: string
   referrerId: string
@@ -76,10 +114,158 @@ export class AuthService {
     referrerReward: 100,
     referredReward: 50,
   }
+  private readonly defaultMissions: Omit<MissionRecord, 'id'>[] = [
+    {
+      name: 'Premiere Visite',
+      description: 'Effectuez votre premier achat',
+      type: 'visit',
+      target: 1,
+      reward: 25,
+      validFrom: new Date().toISOString(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      icon: 'star',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      name: 'Client Fidele',
+      description: 'Effectuez 10 achats',
+      type: 'visit',
+      target: 10,
+      reward: 100,
+      bonusReward: 50,
+      validFrom: new Date().toISOString(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      icon: 'heart',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      name: 'Parrain VIP',
+      description: 'Parrainez 3 amis',
+      type: 'refer',
+      target: 3,
+      reward: 150,
+      validFrom: new Date().toISOString(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      icon: 'users',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      name: 'Gros Achat',
+      description: 'Depensez 100 TND en une seule commande',
+      type: 'spend',
+      target: 100,
+      reward: 75,
+      validFrom: new Date().toISOString(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      icon: 'shopping-bag',
+      createdAt: new Date().toISOString(),
+    },
+  ]
+  private readonly defaultSpecialDays: Omit<SpecialDayRecord, 'id'>[] = [
+    {
+      name: 'Journee des Femmes',
+      description: 'Points doubles pour les femmes le mercredi',
+      targetGender: 'female',
+      dayOfWeek: 3,
+      multiplier: 2,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      name: 'Journee des Hommes',
+      description: 'Points doubles pour les hommes le jeudi',
+      targetGender: 'male',
+      dayOfWeek: 4,
+      multiplier: 2,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    },
+  ]
 
   private sanitizeUser(user: User): Omit<User, 'password'> {
     const { password, ...userWithoutPassword } = user
     return userWithoutPassword
+  }
+
+  private async assertAdmin(actorId: string): Promise<void> {
+    const actor = await UserModel.findById(actorId)
+    if (!actor || actor.role !== 'admin') {
+      throw new Error('Acces refuse')
+    }
+  }
+
+  private missionCollection() {
+    return getDB().collection('missions')
+  }
+
+  private specialDaysCollection() {
+    return getDB().collection('special_days')
+  }
+
+  private clientMissionsCollection() {
+    return getDB().collection('client_missions')
+  }
+
+  private mapMission(doc: any): MissionRecord {
+    return {
+      id: doc._id.toString(),
+      name: doc.name || '',
+      description: doc.description || '',
+      type: doc.type || 'visit',
+      target: doc.target || 0,
+      reward: doc.reward || 0,
+      bonusReward: doc.bonusReward,
+      validFrom: new Date(doc.validFrom).toISOString(),
+      validUntil: new Date(doc.validUntil).toISOString(),
+      isActive: doc.isActive ?? true,
+      icon: doc.icon,
+      createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+    }
+  }
+
+  private mapSpecialDay(doc: any): SpecialDayRecord {
+    return {
+      id: doc._id.toString(),
+      name: doc.name || '',
+      description: doc.description || '',
+      targetGender: doc.targetGender,
+      dayOfWeek: doc.dayOfWeek,
+      specificDate: doc.specificDate,
+      multiplier: doc.multiplier || 1,
+      bonusPoints: doc.bonusPoints,
+      isActive: doc.isActive ?? true,
+      createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+    }
+  }
+
+  private mapClientMission(doc: any): ClientMissionRecord {
+    return {
+      id: doc._id.toString(),
+      clientId: String(doc.clientId || ''),
+      missionId: String(doc.missionId || ''),
+      progress: doc.progress || 0,
+      status: doc.status || 'active',
+      completedAt: doc.completedAt ? new Date(doc.completedAt).toISOString() : undefined,
+      createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+    }
+  }
+
+  private async ensureDefaultMissions() {
+    const collection = this.missionCollection()
+    const count = await collection.countDocuments()
+    if (count > 0) return
+    await collection.insertMany(this.defaultMissions.map((mission) => ({ ...mission, validFrom: new Date(mission.validFrom), validUntil: new Date(mission.validUntil), createdAt: new Date(mission.createdAt) })))
+  }
+
+  private async ensureDefaultSpecialDays() {
+    const collection = this.specialDaysCollection()
+    const count = await collection.countDocuments()
+    if (count > 0) return
+    await collection.insertMany(this.defaultSpecialDays.map((day) => ({ ...day, createdAt: new Date(day.createdAt) })))
   }
 
   private async getReferralConfigDocument() {
@@ -117,6 +303,123 @@ export class AuthService {
       referrerReward: nextConfig.referrerReward,
       referredReward: nextConfig.referredReward,
     }
+  }
+
+  async getMissions(): Promise<MissionRecord[]> {
+    await this.ensureDefaultMissions()
+    const docs = await this.missionCollection().find({}).sort({ createdAt: 1 }).toArray()
+    return docs.map((doc) => this.mapMission(doc))
+  }
+
+  async createMission(actorId: string, mission: Omit<MissionRecord, 'id' | 'createdAt'>): Promise<MissionRecord> {
+    await this.assertAdmin(actorId)
+    const payload = {
+      ...mission,
+      validFrom: new Date(mission.validFrom),
+      validUntil: new Date(mission.validUntil),
+      createdAt: new Date(),
+    }
+    const result = await this.missionCollection().insertOne(payload)
+    const created = await this.missionCollection().findOne({ _id: result.insertedId })
+    return this.mapMission(created)
+  }
+
+  async updateMission(actorId: string, id: string, updates: Partial<Omit<MissionRecord, 'id' | 'createdAt'>>): Promise<MissionRecord> {
+    await this.assertAdmin(actorId)
+    const { ObjectId } = await import('mongodb')
+    await this.missionCollection().updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          ...updates,
+          ...(updates.validFrom ? { validFrom: new Date(updates.validFrom) } : {}),
+          ...(updates.validUntil ? { validUntil: new Date(updates.validUntil) } : {}),
+        },
+      }
+    )
+    const updated = await this.missionCollection().findOne({ _id: new ObjectId(id) })
+    if (!updated) throw new Error('Mission non trouvee')
+    return this.mapMission(updated)
+  }
+
+  async deleteMission(actorId: string, id: string): Promise<void> {
+    await this.assertAdmin(actorId)
+    const { ObjectId } = await import('mongodb')
+    await this.missionCollection().deleteOne({ _id: new ObjectId(id) })
+    await this.clientMissionsCollection().deleteMany({ missionId: id })
+  }
+
+  async getSpecialDays(): Promise<SpecialDayRecord[]> {
+    await this.ensureDefaultSpecialDays()
+    const docs = await this.specialDaysCollection().find({}).sort({ createdAt: 1 }).toArray()
+    return docs.map((doc) => this.mapSpecialDay(doc))
+  }
+
+  async createSpecialDay(actorId: string, day: Omit<SpecialDayRecord, 'id' | 'createdAt'>): Promise<SpecialDayRecord> {
+    await this.assertAdmin(actorId)
+    const result = await this.specialDaysCollection().insertOne({
+      ...day,
+      createdAt: new Date(),
+    })
+    const created = await this.specialDaysCollection().findOne({ _id: result.insertedId })
+    return this.mapSpecialDay(created)
+  }
+
+  async updateSpecialDay(actorId: string, id: string, updates: Partial<Omit<SpecialDayRecord, 'id' | 'createdAt'>>): Promise<SpecialDayRecord> {
+    await this.assertAdmin(actorId)
+    const { ObjectId } = await import('mongodb')
+    await this.specialDaysCollection().updateOne({ _id: new ObjectId(id) }, { $set: updates })
+    const updated = await this.specialDaysCollection().findOne({ _id: new ObjectId(id) })
+    if (!updated) throw new Error('Journee speciale non trouvee')
+    return this.mapSpecialDay(updated)
+  }
+
+  async deleteSpecialDay(actorId: string, id: string): Promise<void> {
+    await this.assertAdmin(actorId)
+    const { ObjectId } = await import('mongodb')
+    await this.specialDaysCollection().deleteOne({ _id: new ObjectId(id) })
+  }
+
+  async getClientMissions(actorId: string): Promise<ClientMissionRecord[]> {
+    const actor = await UserModel.findById(actorId)
+    if (!actor) throw new Error('Utilisateur non trouve')
+    const query = actor.role === 'admin' ? {} : { clientId: actorId }
+    const docs = await this.clientMissionsCollection().find(query).sort({ createdAt: 1 }).toArray()
+    return docs.map((doc) => this.mapClientMission(doc))
+  }
+
+  async saveClientMission(actorId: string, payload: Omit<ClientMissionRecord, 'id'> & { id?: string }): Promise<ClientMissionRecord> {
+    await this.assertLoyaltyAccess(actorId, payload.clientId)
+    const existing = await this.clientMissionsCollection().findOne({
+      clientId: payload.clientId,
+      missionId: payload.missionId,
+    })
+
+    if (existing) {
+      await this.clientMissionsCollection().updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            progress: payload.progress,
+            status: payload.status,
+            completedAt: payload.completedAt ? new Date(payload.completedAt) : undefined,
+          },
+        }
+      )
+      const updated = await this.clientMissionsCollection().findOne({ _id: existing._id })
+      return this.mapClientMission(updated)
+    }
+
+    const result = await this.clientMissionsCollection().insertOne({
+      clientId: payload.clientId,
+      missionId: payload.missionId,
+      progress: payload.progress,
+      status: payload.status,
+      completedAt: payload.completedAt ? new Date(payload.completedAt) : undefined,
+      createdAt: payload.createdAt ? new Date(payload.createdAt) : new Date(),
+    })
+    const created = await this.clientMissionsCollection().findOne({ _id: result.insertedId })
+    return this.mapClientMission(created)
   }
 
   private async assertEmployeeManagementAccess(actorId: string): Promise<User> {

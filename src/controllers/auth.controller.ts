@@ -115,6 +115,146 @@ export const AuthController = {
     }
   },
 
+  async getMissions(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const missions = await authService.getMissions()
+      res.json({ missions })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async createMission(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const mission = await authService.createMission(req.user.id, req.body)
+      res.status(201).json({ mission })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async updateMission(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const mission = await authService.updateMission(req.user.id, req.params.id as any, req.body)
+      res.json({ mission })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async deleteMission(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      await authService.deleteMission(req.user.id, req.params.id as any)
+      res.json({ success: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async getSpecialDays(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const specialDays = await authService.getSpecialDays()
+      res.json({ specialDays })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async createSpecialDay(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const specialDay = await authService.createSpecialDay(req.user.id, req.body)
+      res.status(201).json({ specialDay })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async updateSpecialDay(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const specialDay = await authService.updateSpecialDay(req.user.id, req.params.id as any, req.body)
+      res.json({ specialDay })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async deleteSpecialDay(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      await authService.deleteSpecialDay(req.user.id, req.params.id as any)
+      res.json({ success: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async getClientMissions(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const clientMissions = await authService.getClientMissions(req.user.id)
+      res.json({ clientMissions })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
+  async saveClientMission(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const clientMission = await authService.saveClientMission(req.user.id, req.body)
+      res.json({ clientMission })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
   async updateReferralConfig(req: Request, res: Response) {
     try {
       if (!req.user) {
