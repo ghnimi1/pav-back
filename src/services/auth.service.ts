@@ -94,6 +94,9 @@ export interface GameRewardRecord {
   points: number
   probability: number
   color: string
+  type?: 'points' | 'discount' | 'free_item'
+  value?: number
+  wheelSegment?: number
 }
 
 export interface GameConfigRecord {
@@ -421,9 +424,24 @@ export class AuthService {
         ? doc.rewards.map((reward: any) => ({
             id: String(reward.id || ''),
             name: reward.name || '',
-            points: reward.points || 0,
-            probability: reward.probability || 0,
+            points: typeof reward.points === 'number' ? reward.points : Number.parseFloat(String(reward.points ?? 0)) || 0,
+            probability:
+              typeof reward.probability === 'number'
+                ? reward.probability
+                : typeof reward.pourcentage === 'number'
+                  ? reward.pourcentage
+                  : typeof reward.percentage === 'number'
+                    ? reward.percentage
+                    : Number.parseFloat(String(reward.probability ?? reward.pourcentage ?? reward.percentage ?? 0)) || 0,
             color: reward.color || '#64748b',
+            type: reward.type === 'discount' || reward.type === 'free_item' || reward.type === 'points' ? reward.type : undefined,
+            value: typeof reward.value === 'number' ? reward.value : Number.parseFloat(String(reward.value ?? reward.points ?? 0)) || 0,
+            wheelSegment:
+              typeof reward.wheelSegment === 'number'
+                ? reward.wheelSegment
+                : typeof reward.wheel_segment === 'number'
+                  ? reward.wheel_segment
+                  : Number.parseInt(String(reward.wheelSegment ?? reward.wheel_segment ?? 0), 10) || 0,
           }))
         : [],
     }
@@ -855,7 +873,18 @@ export class AuthService {
           endHour: config.endHour,
           maxPlaysPerDay: config.maxPlaysPerDay,
           minPointsRequired: config.minPointsRequired,
-          rewards: config.rewards,
+          rewards: config.rewards.map((reward) => ({
+            id: reward.id,
+            name: reward.name,
+            points: reward.points,
+            probability: reward.probability,
+            pourcentage: reward.probability,
+            color: reward.color,
+            type: reward.type,
+            value: reward.value,
+            wheelSegment: reward.wheelSegment,
+            wheel_segment: reward.wheelSegment,
+          })),
         }))
       )
     }
