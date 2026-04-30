@@ -8,6 +8,7 @@ import {
   type OrderStatus,
 } from '../models/RemoteOrder.model'
 import { authService } from './auth.service'
+import { notificationsService } from './notifications.service'
 
 export class OrdersService {
   async getAllOrders(): Promise<RemoteOrder[]> {
@@ -62,6 +63,17 @@ export class OrdersService {
       order.clientEmail
     )
 
+    await notificationsService.createAdmin({
+      type: 'info',
+      category: 'order',
+      priority: 'high',
+      title: 'Nouvelle commande',
+      message: `${order.clientName || 'Client'} - ${order.total.toFixed(2)} TND`,
+      actionUrl: '/admin/commandes',
+      actionLabel: 'Voir',
+      metadata: { orderId: order._id, amount: order.total },
+    })
+
     return order
   }
 
@@ -83,6 +95,31 @@ export class OrdersService {
     }
 
     await RemoteOrderModel.update(id, updates)
+
+    if (order.clientId || order.clientEmail) {
+      const statusLabels: Partial<Record<OrderStatus, string>> = {
+        confirmed: 'Votre commande est confirmee',
+        preparing: 'Votre commande est en preparation',
+        ready: 'Votre commande est prete',
+        delivering: 'Votre commande est en livraison',
+        completed: 'Votre commande est terminee',
+      }
+      const title = statusLabels[status]
+      if (title) {
+        await notificationsService.createClient({
+          type: status === 'completed' ? 'success' : 'info',
+          category: 'order',
+          priority: status === 'ready' ? 'high' : 'medium',
+          title,
+          message: `Commande ${order.orderNumber}`,
+          actionUrl: '/commander',
+          actionLabel: 'Voir mes commandes',
+          recipientId: order.clientId,
+          recipientEmail: order.clientEmail,
+          metadata: { orderId: order._id || id },
+        })
+      }
+    }
   }
 
   async cancelOrder(id: string, reason?: string): Promise<void> {
@@ -94,6 +131,21 @@ export class OrdersService {
       cancelledAt: new Date(),
       cancelReason: reason,
     })
+
+    if (order.clientId || order.clientEmail) {
+      await notificationsService.createClient({
+        type: 'warning',
+        category: 'order',
+        priority: 'high',
+        title: 'Commande annulee',
+        message: reason ? `${order.orderNumber} - ${reason}` : `Commande ${order.orderNumber}`,
+        actionUrl: '/commander',
+        actionLabel: 'Voir mes commandes',
+        recipientId: order.clientId,
+        recipientEmail: order.clientEmail,
+        metadata: { orderId: order._id || id },
+      })
+    }
   }
 
   async addStaffNote(id: string, note: string): Promise<void> {

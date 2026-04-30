@@ -72572,7 +72572,7 @@ var require_multer = __commonJS((exports, module) => {
 });
 
 // src/index.ts
-var import_express7 = __toESM(require_express2(), 1);
+var import_express8 = __toESM(require_express2(), 1);
 init_database();
 init_env();
 import fs4 from "fs";
@@ -79956,6 +79956,148 @@ var DeliveryConfigModel = {
   }
 };
 
+// src/models/Notification.model.ts
+var import_mongodb25 = __toESM(require_lib5(), 1);
+init_database();
+var RETENTION_DAYS = 7;
+function toNotification(doc) {
+  if (!doc)
+    return null;
+  return {
+    _id: doc._id.toString(),
+    id: doc._id.toString(),
+    type: doc.type || "info",
+    category: doc.category || "system",
+    priority: doc.priority || "medium",
+    title: doc.title,
+    message: doc.message,
+    read: doc.read === true,
+    actionUrl: doc.actionUrl,
+    actionLabel: doc.actionLabel,
+    recipientRole: doc.recipientRole || "admin",
+    recipientId: doc.recipientId,
+    recipientEmail: doc.recipientEmail,
+    metadata: doc.metadata,
+    createdAt: doc.createdAt || new Date
+  };
+}
+function getUserQuery(user) {
+  return user.role === "admin" ? { recipientRole: { $in: ["admin", "all"] } } : {
+    $or: [
+      { recipientRole: "all" },
+      { recipientRole: "client", recipientId: user.id },
+      { recipientRole: "client", recipientEmail: user.email }
+    ]
+  };
+}
+var NotificationModel = {
+  collection: "notifications",
+  async deleteExpired() {
+    const db2 = getDB();
+    const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    await db2.collection(this.collection).deleteMany({ createdAt: { $lt: cutoff } });
+  },
+  async create(input) {
+    const db2 = getDB();
+    await this.deleteExpired();
+    const notification = {
+      type: input.type,
+      category: input.category || "system",
+      priority: input.priority || "medium",
+      title: input.title,
+      message: input.message,
+      read: false,
+      actionUrl: input.actionUrl,
+      actionLabel: input.actionLabel,
+      recipientRole: input.recipientRole || "admin",
+      recipientId: input.recipientId,
+      recipientEmail: input.recipientEmail,
+      metadata: input.metadata,
+      createdAt: new Date
+    };
+    const result = await db2.collection(this.collection).insertOne(notification);
+    return { _id: result.insertedId.toString(), id: result.insertedId.toString(), ...notification };
+  },
+  async findForUser(user, options = {}) {
+    const db2 = getDB();
+    await this.deleteExpired();
+    const limit = Math.min(Math.max(options.limit || 20, 1), 50);
+    const skip = Math.max(options.skip || 0, 0);
+    const query = getUserQuery(user);
+    const [docs, total, unread] = await Promise.all([
+      db2.collection(this.collection).find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray(),
+      db2.collection(this.collection).countDocuments(query),
+      db2.collection(this.collection).countDocuments({ ...query, read: { $ne: true } })
+    ]);
+    const notifications = docs.map((doc) => toNotification(doc)).filter(Boolean);
+    return {
+      notifications,
+      total,
+      unread,
+      limit,
+      skip,
+      hasMore: skip + notifications.length < total
+    };
+  },
+  async markAsRead(id) {
+    const db2 = getDB();
+    if (!import_mongodb25.ObjectId.isValid(id))
+      return;
+    await db2.collection(this.collection).updateOne({ _id: new import_mongodb25.ObjectId(id) }, { $set: { read: true } });
+  },
+  async markAllAsRead(user, category) {
+    const db2 = getDB();
+    const baseQuery = getUserQuery(user);
+    const query = category ? { ...baseQuery, category } : baseQuery;
+    await db2.collection(this.collection).updateMany(query, { $set: { read: true } });
+  },
+  async delete(id) {
+    const db2 = getDB();
+    if (!import_mongodb25.ObjectId.isValid(id))
+      return;
+    await db2.collection(this.collection).deleteOne({ _id: new import_mongodb25.ObjectId(id) });
+  },
+  async clearForUser(user) {
+    const db2 = getDB();
+    const query = user.role === "admin" ? getUserQuery(user) : {
+      $or: [
+        { recipientRole: "client", recipientId: user.id },
+        { recipientRole: "client", recipientEmail: user.email }
+      ]
+    };
+    await db2.collection(this.collection).deleteMany(query);
+  }
+};
+
+// src/services/notifications.service.ts
+class NotificationsService {
+  getForUser(user, options) {
+    return NotificationModel.findForUser(user, options);
+  }
+  create(input) {
+    return NotificationModel.create(input);
+  }
+  createAdmin(input) {
+    return NotificationModel.create({ ...input, recipientRole: "admin" });
+  }
+  createClient(input) {
+    return NotificationModel.create({ ...input, recipientRole: "client" });
+  }
+  markAsRead(id) {
+    return NotificationModel.markAsRead(id);
+  }
+  markAllAsRead(user, category) {
+    return NotificationModel.markAllAsRead(user, category);
+  }
+  delete(id) {
+    return NotificationModel.delete(id);
+  }
+  clearForUser(user) {
+    return NotificationModel.clearForUser(user);
+  }
+}
+var notificationsService = new NotificationsService;
+
 // src/services/orders.service.ts
 class OrdersService {
   async getAllOrders() {
@@ -79992,6 +80134,16 @@ class OrdersService {
       total: discountedSubtotal + deliveryFee
     });
     await authService.validateReferralFirstPurchaseForClient(order.total, order.clientId, order.clientEmail);
+    await notificationsService.createAdmin({
+      type: "info",
+      category: "order",
+      priority: "high",
+      title: "Nouvelle commande",
+      message: `${order.clientName || "Client"} - ${order.total.toFixed(2)} TND`,
+      actionUrl: "/admin/commandes",
+      actionLabel: "Voir",
+      metadata: { orderId: order._id, amount: order.total }
+    });
     return order;
   }
   async updateOrderStatus(id, status, staffId) {
@@ -80010,6 +80162,30 @@ class OrdersService {
       updates.completedBy = staffId;
     }
     await RemoteOrderModel.update(id, updates);
+    if (order.clientId || order.clientEmail) {
+      const statusLabels = {
+        confirmed: "Votre commande est confirmee",
+        preparing: "Votre commande est en preparation",
+        ready: "Votre commande est prete",
+        delivering: "Votre commande est en livraison",
+        completed: "Votre commande est terminee"
+      };
+      const title = statusLabels[status];
+      if (title) {
+        await notificationsService.createClient({
+          type: status === "completed" ? "success" : "info",
+          category: "order",
+          priority: status === "ready" ? "high" : "medium",
+          title,
+          message: `Commande ${order.orderNumber}`,
+          actionUrl: "/commander",
+          actionLabel: "Voir mes commandes",
+          recipientId: order.clientId,
+          recipientEmail: order.clientEmail,
+          metadata: { orderId: order._id || id }
+        });
+      }
+    }
   }
   async cancelOrder(id, reason) {
     const order = await RemoteOrderModel.findById(id);
@@ -80020,6 +80196,20 @@ class OrdersService {
       cancelledAt: new Date,
       cancelReason: reason
     });
+    if (order.clientId || order.clientEmail) {
+      await notificationsService.createClient({
+        type: "warning",
+        category: "order",
+        priority: "high",
+        title: "Commande annulee",
+        message: reason ? `${order.orderNumber} - ${reason}` : `Commande ${order.orderNumber}`,
+        actionUrl: "/commander",
+        actionLabel: "Voir mes commandes",
+        recipientId: order.clientId,
+        recipientEmail: order.clientEmail,
+        metadata: { orderId: order._id || id }
+      });
+    }
   }
   async addStaffNote(id, note) {
     const order = await RemoteOrderModel.findById(id);
@@ -80176,7 +80366,7 @@ var orders_routes_default = router5;
 var import_express6 = __toESM(require_express2(), 1);
 
 // src/models/DiscountConfig.model.ts
-var import_mongodb25 = __toESM(require_lib5(), 1);
+var import_mongodb26 = __toESM(require_lib5(), 1);
 init_database();
 var DEFAULT_DISCOUNT_TIERS = [
   { id: "tier-1", minAmount: 10, maxAmount: 19.99, percent: 5, name: "Decouverte", color: "bg-emerald-500", isActive: true },
@@ -80224,9 +80414,9 @@ var DiscountConfigModel = {
       ...updates,
       updatedAt: new Date
     };
-    if (current._id && import_mongodb25.ObjectId.isValid(current._id)) {
+    if (current._id && import_mongodb26.ObjectId.isValid(current._id)) {
       const { _id: _id2, ...persistedConfig } = nextConfig;
-      await db2.collection(this.collection).updateOne({ _id: new import_mongodb25.ObjectId(current._id) }, { $set: persistedConfig });
+      await db2.collection(this.collection).updateOne({ _id: new import_mongodb26.ObjectId(current._id) }, { $set: persistedConfig });
       return { ...nextConfig, _id: current._id };
     }
     const { _id, ...insertable } = nextConfig;
@@ -80289,8 +80479,95 @@ router6.get("/config", DiscountsController.getConfig);
 router6.put("/config", authMiddleware, adminOnly, DiscountsController.updateConfig);
 var discounts_routes_default = router6;
 
+// src/routes/notifications.routes.ts
+var import_express7 = __toESM(require_express2(), 1);
+
+// src/controllers/notifications.controller.ts
+function getUser(req) {
+  return {
+    id: req.user?.id,
+    email: req.user?.email,
+    role: req.user?.role
+  };
+}
+var NotificationsController = {
+  async getMyNotifications(req, res) {
+    try {
+      const limit = Number(req.query.limit || 20);
+      const skip = Number(req.query.skip || 0);
+      const result = await notificationsService.getForUser(getUser(req), { limit, skip });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error("Get notifications error:", error);
+      res.status(500).json({ success: false, error: "Erreur lors de la recuperation des notifications" });
+    }
+  },
+  async createNotification(req, res) {
+    try {
+      const user = getUser(req);
+      const notification = await notificationsService.create({
+        ...req.body,
+        recipientRole: user.role === "admin" ? "admin" : "client",
+        recipientId: user.role === "admin" ? undefined : user.id,
+        recipientEmail: user.role === "admin" ? undefined : user.email
+      });
+      res.status(201).json({ success: true, data: notification });
+    } catch (error) {
+      console.error("Create notification error:", error);
+      res.status(400).json({ success: false, error: error.message || "Erreur lors de la creation" });
+    }
+  },
+  async markAsRead(req, res) {
+    try {
+      await notificationsService.markAsRead(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark notification read error:", error);
+      res.status(500).json({ success: false, error: "Erreur lors de la mise a jour" });
+    }
+  },
+  async markAllAsRead(req, res) {
+    try {
+      await notificationsService.markAllAsRead(getUser(req), req.body?.category);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Mark notifications read error:", error);
+      res.status(500).json({ success: false, error: "Erreur lors de la mise a jour" });
+    }
+  },
+  async deleteNotification(req, res) {
+    try {
+      await notificationsService.delete(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete notification error:", error);
+      res.status(500).json({ success: false, error: "Erreur lors de la suppression" });
+    }
+  },
+  async clearNotifications(req, res) {
+    try {
+      await notificationsService.clearForUser(getUser(req));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Clear notifications error:", error);
+      res.status(500).json({ success: false, error: "Erreur lors de la suppression" });
+    }
+  }
+};
+
+// src/routes/notifications.routes.ts
+var router7 = import_express7.Router();
+router7.use(authMiddleware);
+router7.get("/", NotificationsController.getMyNotifications);
+router7.post("/", NotificationsController.createNotification);
+router7.patch("/read-all", NotificationsController.markAllAsRead);
+router7.patch("/:id/read", NotificationsController.markAsRead);
+router7.delete("/", NotificationsController.clearNotifications);
+router7.delete("/:id", NotificationsController.deleteNotification);
+var notifications_routes_default = router7;
+
 // src/index.ts
-var app = import_express7.default();
+var app = import_express8.default();
 var uploadsDir2 = path2.join(process.cwd(), "uploads");
 var allowedOrigins = new Set(env.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean));
 function isAllowedOrigin(origin) {
@@ -80322,15 +80599,16 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(import_express7.default.json({ limit: "10mb" }));
-app.use(import_express7.default.urlencoded({ extended: true, limit: "10mb" }));
-app.use("/uploads", import_express7.default.static(uploadsDir2));
+app.use(import_express8.default.json({ limit: "10mb" }));
+app.use(import_express8.default.urlencoded({ extended: true, limit: "10mb" }));
+app.use("/uploads", import_express8.default.static(uploadsDir2));
 app.use("/api/auth", auth_routes_default);
 app.use("/api/stock", stock_routes_default);
 app.use("/api/production", production_routes_default);
 app.use("/api/menu", menu_routes_default);
 app.use("/api/orders", orders_routes_default);
 app.use("/api/discounts", discounts_routes_default);
+app.use("/api/notifications", notifications_routes_default);
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
