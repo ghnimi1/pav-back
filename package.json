@@ -14,8 +14,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
-    "build": "bun build src/index.ts --target bun --outdir dist",
-    "seed": "bun src/scripts/seed.ts"
+    "seed": "bun src/scripts/seed.ts"    
   },
   "peerDependencies": {
     "typescript": "^6.0.3"
