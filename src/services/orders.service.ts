@@ -24,8 +24,10 @@ export class OrdersService {
 
   async createOrder(data: Omit<CreateRemoteOrderInput, 'orderNumber' | 'estimatedTime' | 'deliveryFee'>): Promise<RemoteOrder> {
     const config = await DeliveryConfigModel.get()
+    const discount = Math.max(0, Number(data.discount || 0))
+    const discountedSubtotal = Math.max(0, data.subtotal - discount)
     const deliveryFee = data.deliveryMode === 'delivery'
-      ? (data.subtotal >= config.freeDeliveryThreshold ? 0 : config.deliveryFee)
+      ? (discountedSubtotal >= config.freeDeliveryThreshold ? 0 : config.deliveryFee)
       : 0
     const estimatedTime = data.deliveryMode === 'delivery'
       ? config.estimatedDeliveryTime
@@ -50,7 +52,8 @@ export class OrdersService {
       orderNumber,
       deliveryFee,
       estimatedTime,
-      total: data.subtotal + deliveryFee,
+      discount,
+      total: discountedSubtotal + deliveryFee,
     })
 
     await authService.validateReferralFirstPurchaseForClient(

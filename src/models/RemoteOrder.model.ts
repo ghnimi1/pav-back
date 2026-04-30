@@ -36,6 +36,9 @@ export interface RemoteOrder {
   orderNumber: string
   items: OrderItem[]
   subtotal: number
+  discount: number
+  discountPercent?: number
+  discountDescription?: string
   deliveryFee: number
   total: number
   totalPoints: number
@@ -65,6 +68,9 @@ export interface CreateRemoteOrderInput {
   orderNumber: string
   items: OrderItem[]
   subtotal: number
+  discount?: number
+  discountPercent?: number
+  discountDescription?: string
   deliveryFee: number
   total: number
   totalPoints: number
@@ -127,6 +133,9 @@ function toRemoteOrder(doc: WithId<Document> | null): RemoteOrder | null {
     orderNumber: doc.orderNumber,
     items: doc.items || [],
     subtotal: doc.subtotal,
+    discount: doc.discount || 0,
+    discountPercent: doc.discountPercent,
+    discountDescription: doc.discountDescription,
     deliveryFee: doc.deliveryFee,
     total: doc.total,
     totalPoints: doc.totalPoints || 0,
@@ -181,6 +190,7 @@ export const RemoteOrderModel = {
     const now = new Date()
     const newOrder: Omit<RemoteOrder, '_id'> = {
       ...input,
+      discount: input.discount || 0,
       status: 'new',
       createdAt: now,
     }

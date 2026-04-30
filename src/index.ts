@@ -8,6 +8,7 @@ import stockRoutes from './routes/stock.routes'
 import productionRoutes from './routes/production.routes'
 import menuRoutes from './routes/menu.routes'  // NOUVEAU
 import ordersRoutes from './routes/orders.routes'
+import discountsRoutes from './routes/discounts.routes'
 
 const app = express()
 const uploadsDir = path.join(process.cwd(), 'uploads')
@@ -71,6 +72,7 @@ app.use('/api/stock', stockRoutes)
 app.use('/api/production', productionRoutes)
 app.use('/api/menu', menuRoutes)  // NOUVEAU
 app.use('/api/orders', ordersRoutes)
+app.use('/api/discounts', discountsRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -45,6 +45,9 @@ export const OrdersController = {
       const order = await ordersService.createOrder({
         items,
         subtotal: Number(body.subtotal || 0),
+        discount: Number(body.discount || 0),
+        discountPercent: Number(body.discountPercent || 0),
+        discountDescription: parseString(body.discountDescription),
         total: Number(body.total || 0),
         totalPoints: Number(body.totalPoints || 0),
         deliveryMode,
