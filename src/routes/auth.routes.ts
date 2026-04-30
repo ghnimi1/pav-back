@@ -38,6 +38,7 @@ router.post('/loyalty-cards/claim', authMiddleware, AuthController.claimLoyaltyC
 router.post('/loyalty/points', authMiddleware, AuthController.awardLoyaltyPoints)
 router.put('/loyalty/client', authMiddleware, AuthController.updateLoyaltyClient)
 router.get('/clients', authMiddleware, AuthController.getClients)
+router.post('/clients', authMiddleware, AuthController.createClient)
 router.get('/referrals', authMiddleware, AuthController.getReferrals)
 router.post('/referrals/:id/validate', authMiddleware, AuthController.validateReferralFirstPurchase)
 router.get('/employees', authMiddleware, AuthController.getEmployees)

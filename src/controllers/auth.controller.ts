@@ -539,6 +539,39 @@ export const AuthController = {
     }
   },
 
+  async createClient(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Non authentifie' })
+      }
+
+      const { email, password, name, phone, loyaltyPoints, loyaltyTier, totalSpent } = req.body
+
+      if (!email || !password || !name) {
+        return res.status(400).json({ error: 'Email, mot de passe et nom requis' })
+      }
+
+      if (typeof password !== 'string' || password.length < 6) {
+        return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caracteres' })
+      }
+
+      const client = await authService.createClient(req.user.id, {
+        email,
+        password,
+        name,
+        phone,
+        loyaltyPoints: typeof loyaltyPoints === 'number' ? loyaltyPoints : Number(loyaltyPoints) || 0,
+        loyaltyTier,
+        totalSpent: typeof totalSpent === 'number' ? totalSpent : Number(totalSpent) || 0,
+      })
+
+      res.status(201).json({ client })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur serveur'
+      res.status(400).json({ error: message })
+    }
+  },
+
   async getReferrals(req: Request, res: Response) {
     try {
       if (!req.user) {

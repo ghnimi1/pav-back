@@ -28,6 +28,16 @@ export interface EmployeeInput {
   isActive?: boolean
 }
 
+export interface ClientInput {
+  email: string
+  password: string
+  name: string
+  phone?: string
+  loyaltyPoints?: number
+  loyaltyTier?: 'bronze' | 'silver' | 'gold' | 'diamond' | 'platinum'
+  totalSpent?: number
+}
+
 export interface LoyaltyPointsInput {
   userId: string
   points: number
@@ -1610,6 +1620,48 @@ export class AuthService {
     //await this.assertEmployeeManagementAccess(actorId)
     const clients = await UserModel.findAllClients()
     return clients.map((client) => this.sanitizeUser(client))
+  }
+
+  async createClient(actorId: string, input: ClientInput): Promise<Omit<User, 'password'>> {
+    //await this.assertEmployeeManagementAccess(actorId)
+
+    const existing = await UserModel.findByEmail(input.email)
+    if (existing) {
+      throw new Error('Cet email est deja utilise')
+    }
+
+    const client = await UserModel.create({
+      email: input.email,
+      password: input.password,
+      name: input.name,
+      role: 'client',
+      phone: input.phone,
+    })
+
+    const loyaltyPoints = Math.max(0, input.loyaltyPoints || 0)
+    const totalSpent = Math.max(0, input.totalSpent || 0)
+
+    if (loyaltyPoints > 0 || totalSpent > 0) {
+      await UserModel.update(client._id!, {
+        loyaltyPoints,
+        lifetimePoints: loyaltyPoints,
+        totalSpent,
+      })
+    }
+
+    if (input.loyaltyTier) {
+      const loyaltyTier = input.loyaltyTier === 'platinum' ? 'diamond' : input.loyaltyTier
+      await UserModel.update(client._id!, {
+        loyaltyTier: loyaltyTier as User['loyaltyTier'],
+      })
+    }
+
+    const createdClient = await UserModel.findById(client._id!)
+    if (!createdClient) {
+      throw new Error('Client non trouve apres creation')
+    }
+
+    return this.sanitizeUser(createdClient)
   }
 
   async createEmployee(actorId: string, input: EmployeeInput): Promise<Omit<User, 'password'>> {
