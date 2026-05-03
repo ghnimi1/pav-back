@@ -338,7 +338,29 @@ export class AuthService {
 
   private sanitizeUser(user: User): Omit<User, 'password'> {
     const { password, ...userWithoutPassword } = user
+    
+    // Ensure permissions are always included for employees
+    if (user.employeeRole) {
+      // If no permissions array, use defaults
+      if (!Array.isArray(userWithoutPassword.permissions)) {
+        userWithoutPassword.permissions = this.getDefaultPermissions(user.employeeRole)
+      }
+    } else {
+      // For non-employees, remove permissions
+      delete (userWithoutPassword as any).permissions
+    }
+    
     return userWithoutPassword
+  }
+
+  private getDefaultPermissions(employeeRole: string): string[] {
+    const defaults: Record<string, string[]> = {
+      super_admin: ['dashboard', 'articles', 'menu', 'categories', 'suppliers', 'batches', 'alerts', 'clients', 'clients_loyalty', 'rewards', 'missions', 'games', 'special_days', 'referrals', 'pos', 'employees'],
+      admin: ['dashboard', 'articles', 'menu', 'categories', 'suppliers', 'batches', 'alerts', 'clients', 'clients_loyalty', 'rewards', 'missions', 'games', 'special_days', 'referrals', 'pos'],
+      manager: ['dashboard', 'articles', 'menu', 'batches', 'alerts', 'clients', 'clients_loyalty', 'pos'],
+      employee: ['dashboard', 'pos'],
+    }
+    return defaults[employeeRole] || []
   }
 
   private async assertAdmin(actorId: string): Promise<void> {
